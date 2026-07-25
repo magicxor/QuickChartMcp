@@ -1,0 +1,46 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
+  "description": "Local stdio MCP server that renders charts via a self-hosted QuickChart instance (Chart.js configs) and saves the resulting image/PDF to an agent-specified directory.",
+  "name": "io.github.magicxor/QuickChartMcp",
+  "version": "0.1.0-beta",
+  "packages": [
+    {
+      "registryType": "nuget",
+      "identifier": "QuickChartMcp",
+      "version": "0.1.0-beta",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [],
+      "environmentVariables": [
+        {
+          "name": "QuickChart__BaseUrl",
+          "description": "Base URL of the QuickChart instance (e.g. http://localhost:3400).",
+          "isRequired": false,
+          "default": "http://localhost:3400"
+        },
+        {
+          "name": "QuickChart__ApiKey",
+          "description": "QuickChart API key, sent as the 'key' request-body property. Leave empty for self-hosted instances, which require none.",
+          "isRequired": false,
+          "isSecret": true
+        },
+        {
+          "name": "QuickChart__TimeoutSeconds",
+          "description": "HTTP timeout in seconds for QuickChart requests (default 60).",
+          "isRequired": false,
+          "default": "60"
+        },
+        {
+          "name": "QuickChart__AllowedOutputPatterns__0",
+          "description": "First regex in the output-directory allow-list (case-insensitive). Add __1, __2, ... for more. An empty allow-list denies ALL writes, so at least one pattern is required for the tool to save files. Example: ^C:\\\\Users\\\\me\\\\charts(\\\\|$)",
+          "isRequired": false
+        }
+      ]
+    }
+  ],
+  "repository": {
+    "url": "https://github.com/magicxor/QuickChartMcp",
+    "source": "github"
+  }
+}

@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="QuickChartMcp/QuickChartMcp.csproj" />
+  <Project Path="QuickChartMcp.Tests/QuickChartMcp.Tests.csproj" />
+</Solution>
