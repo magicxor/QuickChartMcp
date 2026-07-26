@@ -27,12 +27,22 @@ internal sealed class QuickChartTools
         "parallel coordinates: pcp, logarithmicPcp; set diagrams: venn, euler; word clouds: wordCloud. " +
         "Also available: the 'hierarchical' category axis scale, the annotation and datalabels plugins " +
         "(options.plugins.annotation / options.plugins.datalabels), and time scales with moment.js format strings. " +
+        "DATA LABELS: options.plugins.datalabels is on by default for pie/doughnut and off elsewhere, so any " +
+        "datalabels option (e.g. display: true) turns it on. Its default label text already handles object data - " +
+        "an { x, y } point shows the value-axis coordinate, an { x, y, r } bubble shows r, a choropleth row shows " +
+        "the feature name above the value, and a bubbleMap row shows its value - so a custom formatter is only " +
+        "needed to " +
+        "change that text, never to make it readable. A formatter returning an array of strings renders one line " +
+        "per element. " +
         "GEO CHARTS: the instance bundles map data - reference maps by name, do NOT inline GeoJSON for standard maps. " +
         "Map names: 'world', 'world-50m', 'world-land', 'us', 'us-states', 'us-counties', and ISO 3166-1 alpha-3 " +
         "country codes ('deu', 'fra', 'jpn', ...) for a single country with its first-level subdivisions. " +
         "choropleth dataset: { map: '<map name>', data: [{ feature: '<feature name or id>', value: <number> }] } - " +
         "feature strings are matched case-insensitively by properties.name or id " +
         "(e.g. { feature: 'Germany' } on map 'world', { feature: 'California' } on 'us-states'). " +
+        "A choropleth data row may also carry a 'label' - the region's name as it should appear in data labels: " +
+        "built-in maps name their features in English only, so this is how regions get labelled in another " +
+        "language ({ feature: 'Minsk', label: 'Минская', value: 1471 }). " +
         "bubbleMap dataset: { outline: '<map name>', data: [{ longitude, latitude, value }] }. " +
         "When a named map is used, the color/size scales, showOutline and a hidden legend are defaulted " +
         "automatically, and the projection is aimed at the map - including single countries such as Russia or " +
@@ -66,6 +76,11 @@ internal sealed class QuickChartTools
     private const string ChartArgDescription =
         "Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax " +
         "(e.g. with callback functions or unquoted keys) is forwarded as a string for QuickChart to evaluate. " +
+        "Options that take a function - datalabels formatter/display, scales ticks.callback, tooltip callbacks, " +
+        "scriptable colors - work either way: write them unquoted in a JavaScript config, or, in plain JSON, as " +
+        "quoted sources (\"formatter\": \"function(v) { return v.y; }\"), which the QuickChart instance " +
+        "compiles on arrival - this tool forwards the config either way. A quoted source that does not parse " +
+        "comes back as HTTP 400 naming the option. " +
         "MUST use Chart.js 4 syntax: options.scales.x / options.scales.y objects, options.plugins.title / " +
         "options.plugins.legend. Chart.js 2 syntax (scales.xAxes/yAxes arrays, top-level title/legend, " +
         "type 'horizontalBar') is NOT translated and will misrender or be rejected; use type 'bar' with " +
