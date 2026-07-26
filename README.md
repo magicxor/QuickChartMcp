@@ -1,35 +1,89 @@
 # QuickChartMcp
 
 A local **stdio MCP server** (C# / .NET 10) that renders charts via a configured self-hosted
-[QuickChart](https://quickchart.io/) instance and **writes the resulting file to a directory
-the AI agent supplies** in a mandatory argument.
+[QuickChart](https://github.com/magicxor/quickchart) instance and **writes the resulting file
+to a directory the AI agent supplies** in a mandatory argument.
 
-The single `create_chart` tool mirrors the arguments of QuickChart's
-[POST `/chart` endpoint](https://quickchart.io/documentation/usage/post-endpoint/): the agent
-passes a Chart.js configuration plus rendering options, the server POSTs them to the
-configured instance over the internal network, and saves the binary result (PNG/SVG/WebP/
-JPG/PDF) to disk, returning a small summary — the file path, size and metadata — instead of
-an inline blob.
+The single `create_chart` tool mirrors the arguments of QuickChart's POST `/chart` endpoint:
+the agent passes a Chart.js **4** configuration plus rendering options, the server POSTs them
+to the configured instance over the internal network, and saves the binary result
+(PNG/SVG/PDF) to disk, returning a small summary — the file path, size and metadata — instead
+of an inline blob.
+
+> Targets the modernized QuickChart fork (Chart.js 4 only). The legacy `version` parameter
+> and the hosted-service `key` parameter don't exist there and are not exposed by this tool.
 
 ## Tool: `create_chart`
 
 | Argument | Required | Default | Notes |
 |----------|----------|---------|-------|
-| `chart` | yes | — | Chart.js configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax (callback functions, unquoted keys) is forwarded as a string for QuickChart to evaluate |
+| `chart` | yes | — | Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax (callback functions, unquoted keys) is forwarded as a string for QuickChart to evaluate |
 | `outputDirectory` | yes | — | absolute directory the file is written to (created if missing) |
 | `width` | no | `500` | pixel width |
 | `height` | no | `300` | pixel height |
 | `devicePixelRatio` | no | `2.0` | output dimensions are multiplied by this |
 | `backgroundColor` | no | `transparent` | color name, hex, `rgb()` or `hsl()` |
-| `format` | no | `png` | `png`, `svg`, `webp`, `jpg` or `pdf` (`base64` is deliberately not supported — the result is a file) |
-| `version` | no | *(instance default)* | Chart.js version: `2`, `3` or `4` |
+| `format` | no | `png` | `png`, `svg` or `pdf` (`base64` is deliberately not supported — the result is a file) |
 | `fileName` | no | *(derived)* | bare leaf name; derived from the chart title (fallback `chart`) when omitted; a numeric suffix is appended on collision |
 
 On success the tool returns `{ "success": true, "filePath": "...", "bytes": N, ... }`; on any
-error it returns `{ "success": false, "error": "..." }` (plus `statusCode` for QuickChart API
-errors) and writes nothing. A rendering failure reported via the `X-quickchart-error` response
+error it returns `{ "success": false, "error": "..." }` (plus `statusCode`, and a `hint` for
+HTTP 400) and writes nothing. QuickChart's error contract: **400** = invalid request/config
+(fix the config, don't retry unchanged), **500** = server failure; the error message always
+arrives in the `X-quickchart-error` response header. A rendering failure reported via that
 header is treated as an error even when the HTTP status is 200, so an "error image" is never
 saved as a successful chart.
+
+### Supported chart types
+
+- Standard Chart.js 4: `bar`, `line`, `pie`, `doughnut`, `radar`, `polarArea`, `scatter`, `bubble`
+- QuickChart custom: `sparkline`, `progressBar`, `donut` (alias)
+- Box plots: `boxplot`, `horizontalBoxplot`, `violin`, `horizontalViolin`
+- Error bars: `barWithErrorBars`, `lineWithErrorBars`, `scatterWithErrorBars`, `polarAreaWithErrorBars`
+- `funnel`; geo: `choropleth`, `bubbleMap`; graphs/trees: `graph`, `forceDirectedGraph`, `dendrogram`, `tree`
+- Parallel coordinates: `pcp`, `logarithmicPcp`; sets: `venn`, `euler`; `wordCloud`
+- Plus: the `hierarchical` axis scale, `options.plugins.annotation`, `options.plugins.datalabels`,
+  and time scales with moment.js format strings
+
+Configs must use **Chart.js 4 syntax** (`options.scales.x`/`y`, `options.plugins.title`/`legend`);
+Chart.js 2 syntax (`scales.xAxes`/`yAxes`, top-level `title`/`legend`, `type: 'horizontalBar'`)
+is not translated — use `type: 'bar'` with `options.indexAxis: 'y'` for horizontal bars.
+
+### Geo charts
+
+The QuickChart instance bundles map data, so maps are referenced **by name** — no inlined
+GeoJSON needed for standard maps:
+
+| Map name | Contents |
+|---|---|
+| `world`, `world-50m` | all countries (110m / higher-detail 50m) |
+| `world-land` | single land outline |
+| `us`, `us-states`, `us-counties` | US nation outline / states / counties |
+| ISO 3166-1 alpha-3 codes (`deu`, `fra`, `jpn`, …) | one country with its first-level subdivisions |
+
+```jsonc
+{
+  "type": "choropleth",
+  "data": {
+    "datasets": [{
+      "map": "world",
+      "data": [
+        { "feature": "Germany", "value": 83 },   // matched by name or id,
+        { "feature": "France",  "value": 67 }    // case-insensitive
+      ]
+    }]
+  }
+}
+```
+
+`bubbleMap` is analogous with `"outline": "<map name>"` and
+`data: [{ "longitude": ..., "latitude": ..., "value": ... }]`. When a named map is used, the
+`projection`/`color`/`size` scales, `showOutline`, and a hidden legend are defaulted
+automatically; set `options.scales` yourself to override (e.g. projection `albersUsa` for US
+maps). `GET /maps` on the instance lists available maps and `GET /maps?name=<map>` lists a
+map's matchable features. Inline GeoJSON Features still work anywhere a named reference does —
+use them for custom shapes, and mind the instance's request body limit (`EXPRESS_JSON_LIMIT`,
+default 100 KB) when doing so.
 
 ## Configuration
 
@@ -39,7 +93,6 @@ Configure the target QuickChart instance via the `QuickChart` config section —
 | Setting | Env var | Default | Notes |
 |---------|---------|---------|-------|
 | `BaseUrl` | `QuickChart__BaseUrl` | `http://localhost:3400` | QuickChart base URL |
-| `ApiKey` | `QuickChart__ApiKey` | *(empty)* | sent as the `key` request-body property; not needed for self-hosted instances |
 | `TimeoutSeconds` | `QuickChart__TimeoutSeconds` | `60` | per-request HTTP timeout |
 | `AllowedOutputPatterns` | `QuickChart__AllowedOutputPatterns__0`, `__1`, … | *(empty ⇒ deny all)* | regex allow-list for output directories (see below) |
 
@@ -77,10 +130,17 @@ On any rejection the tool returns `{ "success": false, "error": "..." }` and wri
 
 ## Running it
 
-You need a running QuickChart instance. For example:
+You need a running instance of the modernized QuickChart fork. Either build it from
+[magicxor/quickchart](https://github.com/magicxor/quickchart):
 
 ```bash
-docker run -d -p 3400:3400 ianw/quickchart
+docker build -t quickchart . && docker run -d -p 3400:3400 quickchart
+```
+
+or pull a released multi-arch image from GHCR (published on `vX.Y.Z` tags):
+
+```bash
+docker run -d -p 3400:3400 ghcr.io/magicxor/quickchart:latest
 ```
 
 Build and run this MCP server:
@@ -105,6 +165,7 @@ claude mcp add quickchart-local \
 
 - QuickChart evaluates a string `chart` config as JavaScript; that is the documented way to
   use configs containing functions (e.g. tick/label formatters). This server forwards such
-  strings verbatim — sandboxing is the QuickChart instance's responsibility.
+  strings verbatim — sandboxing is the QuickChart instance's responsibility, so only point
+  this tool at an instance you trust and that is not exposed to untrusted parties.
 - On any QuickChart error (bad config, network, server), the tool returns
   `{ "success": false, "error": "...", "statusCode": <code> }` and writes no files.

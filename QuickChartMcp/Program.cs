@@ -34,8 +34,8 @@ builder.Services
 // Compiled output-path allow-list, used by ArtifactWriter to gate every file write.
 builder.Services.AddSingleton<PathPolicy>();
 
-// Typed HttpClient pointed at the configured QuickChart instance. The optional API key is a
-// request-body property ("key"), not a header, so it is applied by QuickChartClient itself.
+// Typed HttpClient pointed at the configured QuickChart instance. The self-hosted fork uses
+// no authentication; access control is expected at the network level.
 builder.Services.AddHttpClient<QuickChartClient>((sp, http) =>
 {
     var options = sp.GetRequiredService<IOptions<QuickChartOptions>>().Value;
