@@ -1,6 +1,6 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
-  "description": "Local stdio MCP server that renders charts via a self-hosted QuickChart instance (Chart.js 4 configs, incl. boxplot/violin, error bars, funnel, geo, graph, pcp, venn and word cloud chart types) and saves the resulting PNG/SVG/PDF to an agent-specified directory.",
+  "description": "Local stdio MCP server that renders charts via a self-hosted QuickChart instance (Chart.js 4 configs, incl. boxplot/violin, error bars, funnel, geo, graph, pcp, venn and word cloud chart types) and saves the resulting PNG/SVG/PDF to an agent-specified directory. Also exposes the instance's built-in geo map registry for discovery (list_maps).",
   "name": "io.github.magicxor/QuickChartMcp",
   "version": "0.1.0-beta",
   "packages": [
