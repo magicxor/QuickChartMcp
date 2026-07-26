@@ -78,12 +78,33 @@ GeoJSON needed for standard maps:
 
 `bubbleMap` is analogous with `"outline": "<map name>"` and
 `data: [{ "longitude": ..., "latitude": ..., "value": ... }]`. When a named map is used, the
-`projection`/`color`/`size` scales, `showOutline`, and a hidden legend are defaulted
-automatically; set `options.scales` yourself to override (e.g. projection `albersUsa` for US
-maps). Use the [`list_maps` tool](#tool-list_maps) to discover available maps and their
-matchable features. Inline GeoJSON Features still work anywhere a named reference does —
-use them for custom shapes, and mind the instance's request body limit (`EXPRESS_JSON_LIMIT`,
-default 100 KB) when doing so.
+`color`/`size` scales, `showOutline`, and a hidden legend are defaulted automatically, and the
+projection is **aimed at the map** — so a single country renders correctly framed without any
+`options.scales.projection` of your own. Use the [`list_maps` tool](#tool-list_maps) to
+discover available maps, their matchable features, and the projection spec the instance aims at
+each one. Inline GeoJSON Features still work anywhere a named reference does — use them for
+custom shapes, and mind the instance's request body limit (`EXPRESS_JSON_LIMIT`, default
+100 KB) when doing so.
+
+#### Showing part of a map
+
+Set `options.scales.projection.fit` to frame the view on a region; everything outside is
+clipped, and the automatic projection is aimed at the region rather than at the whole map:
+
+```jsonc
+"scales": {
+  "projection": { "axis": "x", "fit": [-25, 34, 45, 72] },              // [W, S, E, N] degrees
+  "projection": { "axis": "x", "fit": { "map": "rus",
+                                        "features": ["Amur", "Sakhalin"] } },  // named features
+  "projection": { "axis": "x", "fit": { "map": "deu" } }                // a whole map
+}
+```
+
+West may exceed east for a region past the antimeridian (`[160, 62, -172, 72]` is Chukotka).
+To aim a projection by hand instead, `projection` accepts an object —
+`{ "type": "conicEqualArea", "rotate": [-100, 0], "center": [0, 65], "parallels": [50, 70] }`
+— and the scale's `projectionScale`, `projectionOffset` and `padding` nudge the result in
+pixel space. A hand-named projection is not aimed for you.
 
 ## Tool: `list_maps`
 
@@ -92,7 +113,7 @@ map names and feature spellings without HTTP access to the instance:
 
 | Argument | Required | Default | Notes |
 |----------|----------|---------|-------|
-| `mapName` | no | *(none)* | omit to list all maps as `{ name, source }`; set (e.g. `world`, `us-states`, `deu`) to get that map's features as `{ name, id }` pairs |
+| `mapName` | no | *(none)* | omit to list all maps as `{ name, source }`; set (e.g. `world`, `us-states`, `deu`) to get that map's `features` as `{ name, id }` pairs, plus its `bbox` (`[W, S, E, N]`; west > east when the map crosses the antimeridian), `centroid`, and the `projection` spec the instance aims at it |
 
 Returns JSON inline (`{ "success": true, "maps": [...] }` or `{ "success": true, "map": {...} }`)
 and writes no files. Useful when a country map's ISO alpha-3 code is non-standard (e.g. `kos`

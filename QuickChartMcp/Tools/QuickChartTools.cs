@@ -34,9 +34,18 @@ internal sealed class QuickChartTools
         "feature strings are matched case-insensitively by properties.name or id " +
         "(e.g. { feature: 'Germany' } on map 'world', { feature: 'California' } on 'us-states'). " +
         "bubbleMap dataset: { outline: '<map name>', data: [{ longitude, latitude, value }] }. " +
-        "When a named map is used, the projection/color/size scales, showOutline, and a hidden legend are defaulted " +
-        "automatically; override via options.scales (e.g. projection 'albersUsa' for US maps) if needed. " +
-        "Use the list_maps tool to discover available maps and each map's matchable features. " +
+        "When a named map is used, the color/size scales, showOutline and a hidden legend are defaulted " +
+        "automatically, and the projection is aimed at the map - including single countries such as Russia or " +
+        "New Zealand - so do NOT name a projection yourself unless you have a reason to. " +
+        "To show only part of a map, set options.scales.projection.fit to [west, south, east, north] in degrees " +
+        "(west may exceed east for a region past the antimeridian), { map, features: [...] }, { map } or GeoJSON: " +
+        "the view is framed on that region, the projection is aimed at it, and everything outside is clipped. " +
+        "To aim a projection by hand, options.scales.projection.projection also accepts an object - " +
+        "{ type: 'conicEqualArea', rotate: [-100, 0], center: [0, 65], parallels: [50, 70] }, plus clipAngle, " +
+        "clipExtent, precision, angle, reflectX, reflectY - and pixel-space nudging is available via the scale's " +
+        "projectionScale, projectionOffset and padding options. " +
+        "Use the list_maps tool to discover available maps, each map's matchable features, and the projection " +
+        "spec the server would aim at it. " +
         "Inline GeoJSON Features still work anywhere a named reference does - use them only for custom shapes. " +
         "JS-string configs can also call getMap('<map name>'), which returns { features, topology }.";
 
@@ -44,10 +53,14 @@ internal sealed class QuickChartTools
         "List the built-in geo maps available on the QuickChart instance for choropleth/bubbleMap charts " +
         "(see create_chart). Without mapName: returns every available map as { name, source } - sources are " +
         "world-atlas, us-atlas, and datamaps (per-country ISO 3166-1 alpha-3 maps; a few codes are non-standard, " +
-        "e.g. 'kos' for Kosovo). With mapName: returns { name, source, features: [{ name, id }] } - the feature " +
-        "names/ids that choropleth data rows can reference, matched case-insensitively by name first, then id. " +
+        "e.g. 'kos' for Kosovo). With mapName: returns { name, source, bbox, centroid, projection, " +
+        "features: [{ name, id }] } - the feature names/ids that choropleth data rows can reference, matched " +
+        "case-insensitively by name first, then id; the map's extent as [west, south, east, north] degrees " +
+        "(west > east when the map crosses the antimeridian); and the projection spec the server aims at this map, " +
+        "which can be copied into options.scales.projection.projection and adjusted. " +
         "Call this before create_chart when unsure of a country map code or of exact feature names/ids " +
-        "(subdivision names are in local spelling, some are null and only matchable by id, e.g. 'DE.BE'). " +
+        "(subdivision names are in local spelling, some are null and only matchable by id, e.g. 'DE.BE'), " +
+        "or when picking coordinates for a projection fit region. " +
         "Note: 'us-counties' has ~3200 features, so prefer listing smaller maps. Returns JSON inline; writes no files.";
 
     private const string ChartArgDescription =
