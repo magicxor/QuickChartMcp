@@ -82,9 +82,10 @@ GeoJSON needed for standard maps:
     "datasets": [{
       "map": "world",
       "data": [
-        { "feature": "Germany", "value": 83 },   // matched by name or id,
-        { "feature": "France",  "value": 67 }    // case-insensitive
-        // optional "label": names the region in data labels, in any language
+        // rows are matched by feature name or id, case-insensitively;
+        // the optional "label" is what data labels print for that region
+        { "feature": "Germany", "label": "Deutschland", "value": 83 },
+        { "feature": "France",  "value": 67 }
       ]
     }]
   }

@@ -77,8 +77,9 @@ internal sealed class QuickChartTools
         "(e.g. with callback functions or unquoted keys) is forwarded as a string for QuickChart to evaluate. " +
         "Options that take a function - datalabels formatter/display, scales ticks.callback, tooltip callbacks, " +
         "scriptable colors - work either way: write them unquoted in a JavaScript config, or, in plain JSON, as " +
-        "quoted sources (\"formatter\": \"function(v) { return v.y; }\") which the server compiles. A quoted " +
-        "source that does not parse is rejected with HTTP 400 naming the option. " +
+        "quoted sources (\"formatter\": \"function(v) { return v.y; }\"), which the QuickChart instance " +
+        "compiles on arrival - this tool forwards the config either way. A quoted source that does not parse " +
+        "comes back as HTTP 400 naming the option. " +
         "MUST use Chart.js 4 syntax: options.scales.x / options.scales.y objects, options.plugins.title / " +
         "options.plugins.legend. Chart.js 2 syntax (scales.xAxes/yAxes arrays, top-level title/legend, " +
         "type 'horizontalBar') is NOT translated and will misrender or be rejected; use type 'bar' with " +
