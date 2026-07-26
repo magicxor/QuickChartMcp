@@ -230,8 +230,9 @@ claude mcp add quickchart-local \
 
 - QuickChart evaluates a string `chart` config as JavaScript; that is the documented way to
   use configs containing functions (e.g. tick/label formatters), and it also compiles function
-  sources quoted inside a JSON config. This server forwards both verbatim — sandboxing is the
-  QuickChart instance's responsibility, so only point this tool at an instance you trust and
-  that is not exposed to untrusted parties.
+  sources quoted inside a JSON config. This server inspects neither form and rewrites nothing
+  — a JavaScript config travels as the string you passed, a JSON one is parsed and re-serialized
+  as an object — so sandboxing is the QuickChart instance's responsibility: only point this tool
+  at an instance you trust and that is not exposed to untrusted parties.
 - On any QuickChart error (bad config, network, server), the tool returns
   `{ "success": false, "error": "...", "statusCode": <code> }` and writes no files.
