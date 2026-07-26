@@ -86,8 +86,8 @@ internal sealed class QuickChartTools
     public async Task<object> CreateChart(
         [Description(ChartArgDescription)] string chart,
         [Description("Directory where the chart file will be written. Must be an absolute path. Created if it does not exist. REQUIRED.")] string outputDirectory,
-        [Description("Chart width in pixels (default 500).")] int width = 500,
-        [Description("Chart height in pixels (default 300).")] int height = 300,
+        [Description("Chart width in pixels (default 1280).")] int width = 1280,
+        [Description("Chart height in pixels (default 1280).")] int height = 1280,
         [Description("Device pixel ratio; output dimensions are multiplied by this (default 2.0; use 1.0 for exact width/height).")] double devicePixelRatio = 2.0,
         [Description("Canvas background color: a color name, hex, rgb() or hsl() value (default 'transparent').")] string backgroundColor = "transparent",
         [Description("Output format: 'png' (default), 'svg' or 'pdf'.")] string format = "png",

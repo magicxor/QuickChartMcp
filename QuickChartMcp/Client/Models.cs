@@ -22,7 +22,7 @@ public sealed record ChartRequest
 
     public int Width { get; init; } = 1280;
 
-    public int Height { get; init; } = 850;
+    public int Height { get; init; } = 1280;
 
     public double DevicePixelRatio { get; init; } = 2.0;
 
