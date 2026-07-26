@@ -60,8 +60,8 @@ the option instead of being drawn as a label.
 `options.plugins.datalabels` is on by default for pie/doughnut and off elsewhere, so any
 datalabels option turns it on. Its default label text handles object data without a formatter:
 an `{ x, y }` point shows the value-axis coordinate, `{ x, y, r }` shows `r`, a choropleth row
-shows the feature name above the value, a `bubbleMap` row its value. A formatter that returns an
-array of strings renders one line per element.
+shows the feature name above the value, and a `bubbleMap` row shows its value. A formatter that
+returns an array of strings renders one line per element.
 
 ### Geo charts
 

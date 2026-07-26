@@ -30,7 +30,8 @@ internal sealed class QuickChartTools
         "DATA LABELS: options.plugins.datalabels is on by default for pie/doughnut and off elsewhere, so any " +
         "datalabels option (e.g. display: true) turns it on. Its default label text already handles object data - " +
         "an { x, y } point shows the value-axis coordinate, an { x, y, r } bubble shows r, a choropleth row shows " +
-        "the feature name above the value, a bubbleMap row its value - so a custom formatter is only needed to " +
+        "the feature name above the value, and a bubbleMap row shows its value - so a custom formatter is only " +
+        "needed to " +
         "change that text, never to make it readable. A formatter returning an array of strings renders one line " +
         "per element. " +
         "GEO CHARTS: the instance bundles map data - reference maps by name, do NOT inline GeoJSON for standard maps. " +
