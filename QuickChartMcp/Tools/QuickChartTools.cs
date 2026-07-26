@@ -212,7 +212,7 @@ internal sealed class QuickChartTools
             success = false,
             error = api.Message,
             statusCode = api.StatusCode,
-            hint = "QuickChart rejected the chart configuration. Fix the config (Chart.js 4 syntax) and retry.",
+            hint = "QuickChart rejected the request (HTTP 400). Fix the chart config/request (Chart.js 4 syntax, supported chart types, sizes/body limits) and retry.",
         },
         QuickChartApiException api => new { success = false, error = api.Message, statusCode = api.StatusCode },
         _ => new { success = false, error = ex.Message },
