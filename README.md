@@ -93,10 +93,12 @@ clipped, and the automatic projection is aimed at the region rather than at the 
 
 ```jsonc
 "scales": {
-  "projection": { "axis": "x", "fit": [-25, 34, 45, 72] },              // [W, S, E, N] degrees
-  "projection": { "axis": "x", "fit": { "map": "rus",
-                                        "features": ["Amur", "Sakhalin"] } },  // named features
-  "projection": { "axis": "x", "fit": { "map": "deu" } }                // a whole map
+  // bbox: [W, S, E, N] degrees
+  "projection": { "axis": "x", "fit": [-25, 34, 45, 72] },
+  // named features:
+  // "projection": { "axis": "x", "fit": { "map": "rus", "features": ["Amur", "Sakhalin"] } },
+  // whole map:
+  // "projection": { "axis": "x", "fit": { "map": "deu" } }
 }
 ```
 
