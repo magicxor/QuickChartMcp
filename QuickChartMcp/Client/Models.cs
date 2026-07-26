@@ -20,9 +20,9 @@ public sealed record ChartRequest
     /// </summary>
     public required JsonNode Chart { get; init; }
 
-    public int Width { get; init; } = 500;
+    public int Width { get; init; } = 1280;
 
-    public int Height { get; init; } = 300;
+    public int Height { get; init; } = 850;
 
     public double DevicePixelRatio { get; init; } = 2.0;
 
