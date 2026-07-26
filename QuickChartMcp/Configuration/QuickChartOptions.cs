@@ -12,14 +12,6 @@ public sealed class QuickChartOptions
     /// <summary>Base URL of the QuickChart instance, e.g. http://localhost:3400.</summary>
     public string BaseUrl { get; set; } = "http://localhost:3400";
 
-    /// <summary>
-    /// Optional QuickChart API key, sent as the "key" property of the request body (QuickChart
-    /// uses no auth header). Leave empty for self-hosted instances, which require none. This is
-    /// deliberately a server-side setting: the MCP tool does not expose it, so the AI agent
-    /// never sees or controls it.
-    /// </summary>
-    public string? ApiKey { get; set; }
-
     /// <summary>HTTP timeout in seconds for QuickChart requests.</summary>
     public int TimeoutSeconds { get; set; } = 60;
 

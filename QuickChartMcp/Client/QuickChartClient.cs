@@ -1,8 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Options;
-using QuickChartMcp.Configuration;
 
 namespace QuickChartMcp.Client;
 
@@ -11,6 +9,11 @@ namespace QuickChartMcp.Client;
 /// timeout are configured on the injected HttpClient (see Program.cs). Request JSON uses
 /// camelCase property names, which is what QuickChart expects.
 /// </summary>
+/// <remarks>
+/// Error contract of the target (modernized fork): invalid requests/configs return HTTP 400,
+/// unexpected server failures return 500; in both cases the error message is rendered as an
+/// image and echoed in the <c>X-quickchart-error</c> response header.
+/// </remarks>
 public sealed class QuickChartClient
 {
     private const string ErrorHeader = "X-quickchart-error";
@@ -21,24 +24,17 @@ public sealed class QuickChartClient
     };
 
     private readonly HttpClient _http;
-    private readonly QuickChartOptions _options;
 
-    public QuickChartClient(HttpClient http, IOptions<QuickChartOptions> options)
+    public QuickChartClient(HttpClient http)
     {
         _http = http;
-        _options = options.Value;
     }
 
     public readonly record struct ChartResult(byte[] Bytes, string? ContentType);
 
-    /// <summary>Renders a chart and returns the raw response bytes (png/svg/webp/jpg/pdf).</summary>
+    /// <summary>Renders a chart and returns the raw response bytes (png/svg/pdf).</summary>
     public async Task<ChartResult> CreateChartAsync(ChartRequest request, CancellationToken ct)
     {
-        // The API key travels in the request body ("key"; QuickChart uses no auth header). It is
-        // a server-side setting applied here so the calling agent never sees or controls it.
-        if (!string.IsNullOrWhiteSpace(_options.ApiKey))
-            request = request with { Key = _options.ApiKey };
-
         using var response = await _http.PostAsJsonAsync("chart", request, JsonOptions, ct);
         await EnsureSuccessAsync(response, ct);
 
