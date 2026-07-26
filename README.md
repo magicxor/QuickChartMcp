@@ -103,10 +103,22 @@ clipped, and the automatic projection is aimed at the region rather than at the 
 ```
 
 West may exceed east for a region past the antimeridian (`[160, 62, -172, 72]` is Chukotka).
-To aim a projection by hand instead, `projection` accepts an object —
-`{ "type": "conicEqualArea", "rotate": [-100, 0], "center": [0, 65], "parallels": [50, 70] }`
-— and the scale's `projectionScale`, `projectionOffset` and `padding` nudge the result in
-pixel space. A hand-named projection is not aimed for you.
+
+To aim a projection by hand instead, note that the scale is `options.scales.projection` and the
+projection *it uses* is its own `projection` option — i.e. `options.scales.projection.projection`,
+which takes a name, `"auto"`, or an object:
+
+```jsonc
+"scales": {
+  "projection": {
+    "axis": "x",
+    "projection": { "type": "conicEqualArea", "rotate": [-100, 0], "center": [0, 65], "parallels": [50, 70] }
+  }
+}
+```
+
+The same scale's `projectionScale`, `projectionOffset` and `padding` nudge the result in pixel
+space. A hand-named projection is not aimed for you.
 
 ## Tool: `list_maps`
 

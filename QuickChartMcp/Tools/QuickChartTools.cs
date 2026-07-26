@@ -60,7 +60,7 @@ internal sealed class QuickChartTools
         "which can be copied into options.scales.projection.projection and adjusted. " +
         "Call this before create_chart when unsure of a country map code or of exact feature names/ids " +
         "(subdivision names are in local spelling, some are null and only matchable by id, e.g. 'DE.BE'), " +
-        "or when picking coordinates for a projection fit region. " +
+        "or when picking the coordinates/features for an options.scales.projection.fit region. " +
         "Note: 'us-counties' has ~3200 features, so prefer listing smaller maps. Returns JSON inline; writes no files.";
 
     private const string ChartArgDescription =

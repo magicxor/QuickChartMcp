@@ -13,8 +13,8 @@ returning only a compact summary (file path, size, metadata) instead of an inlin
   optional `fileName`. Supports all chart types of the target fork, including boxplot/violin,
   error bars, funnel, geo (choropleth/bubbleMap with built-in named maps — `world`,
   `us-states`, ISO alpha-3 country codes, … — or inline GeoJSON for custom shapes; the
-  projection is aimed at the map automatically, and `scales.projection.fit` frames the view on
-  a region), graph/tree, parallel coordinates, venn/euler and word clouds. QuickChart's 400
+  projection is aimed at the map automatically, and `options.scales.projection.fit` frames the
+  view on a region), graph/tree, parallel coordinates, venn/euler and word clouds. QuickChart's 400
   responses (invalid config) are surfaced with a fix-your-config hint; error images are never
   saved as successful charts.
 - `list_maps` — proxies QuickChart's `GET /maps` discovery endpoint: without arguments lists
