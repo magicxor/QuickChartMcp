@@ -17,7 +17,7 @@ of an inline blob.
 
 | Argument | Required | Default | Notes |
 |----------|----------|---------|-------|
-| `chart` | yes | — | Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax (callback functions, unquoted keys) is forwarded as a string for QuickChart to evaluate |
+| `chart` | yes | — | Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax (callback functions, unquoted keys) is forwarded as a string for QuickChart to evaluate. Function-valued options may also be quoted sources inside plain JSON — the instance compiles them (see [Callbacks](#callbacks-and-data-labels)) |
 | `outputDirectory` | yes | — | absolute directory the file is written to (created if missing) |
 | `width` | no | `500` | pixel width |
 | `height` | no | `300` | pixel height |
@@ -49,6 +49,20 @@ Configs must use **Chart.js 4 syntax** (`options.scales.x`/`y`, `options.plugins
 Chart.js 2 syntax (`scales.xAxes`/`yAxes`, top-level `title`/`legend`, `type: 'horizontalBar'`)
 is not translated — use `type: 'bar'` with `options.indexAxis: 'y'` for horizontal bars.
 
+### Callbacks and data labels
+
+Options that take a function — the datalabels `formatter`/`display`, `ticks.callback`, tooltip
+callbacks, scriptable colors — can be written two ways: unquoted in a JavaScript config, or as a
+quoted source in plain JSON (`"formatter": "function(v) { return v.y; }"`), which the instance
+compiles before rendering. A quoted source that does not parse comes back as an HTTP 400 naming
+the option instead of being drawn as a label.
+
+`options.plugins.datalabels` is on by default for pie/doughnut and off elsewhere, so any
+datalabels option turns it on. Its default label text handles object data without a formatter:
+an `{ x, y }` point shows the value-axis coordinate, `{ x, y, r }` shows `r`, a choropleth row
+shows the feature name above the value, a `bubbleMap` row its value. A formatter that returns an
+array of strings renders one line per element.
+
 ### Geo charts
 
 The QuickChart instance bundles map data, so maps are referenced **by name** — no inlined
@@ -70,6 +84,7 @@ GeoJSON needed for standard maps:
       "data": [
         { "feature": "Germany", "value": 83 },   // matched by name or id,
         { "feature": "France",  "value": 67 }    // case-insensitive
+        // optional "label": names the region in data labels, in any language
       ]
     }]
   }
@@ -213,8 +228,9 @@ claude mcp add quickchart-local \
 ## Notes
 
 - QuickChart evaluates a string `chart` config as JavaScript; that is the documented way to
-  use configs containing functions (e.g. tick/label formatters). This server forwards such
-  strings verbatim — sandboxing is the QuickChart instance's responsibility, so only point
-  this tool at an instance you trust and that is not exposed to untrusted parties.
+  use configs containing functions (e.g. tick/label formatters), and it also compiles function
+  sources quoted inside a JSON config. This server forwards both verbatim — sandboxing is the
+  QuickChart instance's responsibility, so only point this tool at an instance you trust and
+  that is not exposed to untrusted parties.
 - On any QuickChart error (bad config, network, server), the tool returns
   `{ "success": false, "error": "...", "statusCode": <code> }` and writes no files.
