@@ -27,11 +27,18 @@ internal sealed class QuickChartTools
         "parallel coordinates: pcp, logarithmicPcp; set diagrams: venn, euler; word clouds: wordCloud. " +
         "Also available: the 'hierarchical' category axis scale, the annotation and datalabels plugins " +
         "(options.plugins.annotation / options.plugins.datalabels), and time scales with moment.js format strings. " +
-        "GEO CHARTS: the instance bundles no map files, so GeoJSON must be inlined in the config. " +
-        "choropleth dataset: { outline: <GeoJSON Feature or Feature[]>, data: [{ feature: <GeoJSON Feature>, value: <number> }] }. " +
-        "bubbleMap dataset: { outline: <GeoJSON Feature or Feature[]>, showOutline: true, data: [{ longitude, latitude, value }] }. " +
-        "Both need options.scales: { projection: { axis: 'x', projection: 'equalEarth' }, color: { axis: 'x' } } " +
-        "(use a 'size' scale instead of 'color' for bubbleMap).";
+        "GEO CHARTS: the instance bundles map data - reference maps by name, do NOT inline GeoJSON for standard maps. " +
+        "Map names: 'world', 'world-50m', 'world-land', 'us', 'us-states', 'us-counties', and ISO 3166-1 alpha-3 " +
+        "country codes ('deu', 'fra', 'jpn', ...) for a single country with its first-level subdivisions. " +
+        "choropleth dataset: { map: '<map name>', data: [{ feature: '<feature name or id>', value: <number> }] } - " +
+        "feature strings are matched case-insensitively by properties.name or id " +
+        "(e.g. { feature: 'Germany' } on map 'world', { feature: 'California' } on 'us-states'). " +
+        "bubbleMap dataset: { outline: '<map name>', data: [{ longitude, latitude, value }] }. " +
+        "When a named map is used, the projection/color/size scales, showOutline, and a hidden legend are defaulted " +
+        "automatically; override via options.scales (e.g. projection 'albersUsa' for US maps) if needed. " +
+        "GET /maps on the instance lists available maps; GET /maps?name=<map> lists each map's matchable features. " +
+        "Inline GeoJSON Features still work anywhere a named reference does - use them only for custom shapes. " +
+        "JS-string configs can also call getMap('<map name>'), which returns { features, topology }.";
 
     private const string ChartArgDescription =
         "Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax " +

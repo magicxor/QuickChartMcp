@@ -11,9 +11,11 @@ returning only a compact summary (file path, size, metadata) instead of an inlin
   JSON or JavaScript-syntax string), `width`, `height`, `devicePixelRatio`,
   `backgroundColor`, `format` (`png`/`svg`/`pdf`), plus a required `outputDirectory` and an
   optional `fileName`. Supports all chart types of the target fork, including boxplot/violin,
-  error bars, funnel, geo (choropleth/bubbleMap with inline GeoJSON), graph/tree, parallel
-  coordinates, venn/euler and word clouds. QuickChart's 400 responses (invalid config) are
-  surfaced with a fix-your-config hint; error images are never saved as successful charts.
+  error bars, funnel, geo (choropleth/bubbleMap with built-in named maps — `world`,
+  `us-states`, ISO alpha-3 country codes, … — or inline GeoJSON for custom shapes),
+  graph/tree, parallel coordinates, venn/euler and word clouds. QuickChart's 400 responses
+  (invalid config) are surfaced with a fix-your-config hint; error images are never saved as
+  successful charts.
 
 ## Configuration
 

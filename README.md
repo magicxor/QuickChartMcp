@@ -51,33 +51,39 @@ is not translated — use `type: 'bar'` with `options.indexAxis: 'y'` for horizo
 
 ### Geo charts
 
-The QuickChart instance bundles no map files: GeoJSON must be inlined in the config.
+The QuickChart instance bundles map data, so maps are referenced **by name** — no inlined
+GeoJSON needed for standard maps:
+
+| Map name | Contents |
+|---|---|
+| `world`, `world-50m` | all countries (110m / higher-detail 50m) |
+| `world-land` | single land outline |
+| `us`, `us-states`, `us-counties` | US nation outline / states / counties |
+| ISO 3166-1 alpha-3 codes (`deu`, `fra`, `jpn`, …) | one country with its first-level subdivisions |
 
 ```jsonc
 {
   "type": "choropleth",
   "data": {
-    "labels": ["Region A", "Region B"],
     "datasets": [{
-      "outline": [ /* GeoJSON Feature(s) */ ],
+      "map": "world",
       "data": [
-        { "feature": { /* GeoJSON Feature */ }, "value": 3 },
-        { "feature": { /* GeoJSON Feature */ }, "value": 8 }
+        { "feature": "Germany", "value": 83 },   // matched by name or id,
+        { "feature": "France",  "value": 67 }    // case-insensitive
       ]
     }]
-  },
-  "options": {
-    "scales": {
-      "projection": { "axis": "x", "projection": "equalEarth" },
-      "color": { "axis": "x" }
-    }
   }
 }
 ```
 
-`bubbleMap` is analogous with `data: [{ "longitude": ..., "latitude": ..., "value": ... }]`,
-`showOutline: true`, and a `size` scale instead of `color`. Mind the instance's request body
-limit (`EXPRESS_JSON_LIMIT`, default 100 KB) when inlining large maps.
+`bubbleMap` is analogous with `"outline": "<map name>"` and
+`data: [{ "longitude": ..., "latitude": ..., "value": ... }]`. When a named map is used, the
+`projection`/`color`/`size` scales, `showOutline`, and a hidden legend are defaulted
+automatically; set `options.scales` yourself to override (e.g. projection `albersUsa` for US
+maps). `GET /maps` on the instance lists available maps and `GET /maps?name=<map>` lists a
+map's matchable features. Inline GeoJSON Features still work anywhere a named reference does —
+use them for custom shapes, and mind the instance's request body limit (`EXPRESS_JSON_LIMIT`,
+default 100 KB) when doing so.
 
 ## Configuration
 
