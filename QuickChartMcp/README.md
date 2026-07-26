@@ -5,7 +5,7 @@ Local **stdio MCP server** that renders charts via a configured self-hosted
 fork) and writes the resulting file (PNG/SVG/PDF) to a directory the calling agent specifies,
 returning only a compact summary (file path, size, metadata) instead of an inline blob.
 
-## Tool
+## Tools
 
 - `create_chart` — mirrors QuickChart's POST `/chart` endpoint: `chart` (Chart.js 4 config as
   JSON or JavaScript-syntax string), `width`, `height`, `devicePixelRatio`,
@@ -16,6 +16,10 @@ returning only a compact summary (file path, size, metadata) instead of an inlin
   graph/tree, parallel coordinates, venn/euler and word clouds. QuickChart's 400 responses
   (invalid config) are surfaced with a fix-your-config hint; error images are never saved as
   successful charts.
+- `list_maps` — proxies QuickChart's `GET /maps` discovery endpoint: without arguments lists
+  the built-in geo maps (`{ name, source }`); with `mapName` returns that map's matchable
+  features (`{ name, id }` pairs) for choropleth data rows. Returns JSON inline, writes no
+  files.
 
 ## Configuration
 

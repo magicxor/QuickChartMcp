@@ -1,5 +1,6 @@
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 
 namespace QuickChartMcp.Client;
@@ -40,6 +41,27 @@ public sealed class QuickChartClient
 
         var bytes = await response.Content.ReadAsByteArrayAsync(ct);
         return new ChartResult(bytes, response.Content.Headers.ContentType?.MediaType);
+    }
+
+    /// <summary>
+    /// Lists the built-in geo maps (GET /maps), or — when <paramref name="mapName"/> is
+    /// given — one map's matchable features (GET /maps?name=...). The endpoint returns
+    /// plain JSON; unknown map names come back as HTTP 400 with the X-quickchart-error
+    /// header, which <see cref="EnsureSuccessAsync"/> turns into a QuickChartApiException.
+    /// </summary>
+    public async Task<JsonNode> ListMapsAsync(string? mapName, CancellationToken ct)
+    {
+        var uri = string.IsNullOrWhiteSpace(mapName)
+            ? "maps"
+            : $"maps?name={Uri.EscapeDataString(mapName)}";
+
+        using var response = await _http.GetAsync(uri, ct);
+        await EnsureSuccessAsync(response, ct);
+
+        await using var stream = await response.Content.ReadAsStreamAsync(ct);
+        var node = await JsonNode.ParseAsync(stream, cancellationToken: ct);
+        return node ?? throw new QuickChartApiException(
+            (int)response.StatusCode, "GET /maps returned an empty response body.");
     }
 
     /// <summary>

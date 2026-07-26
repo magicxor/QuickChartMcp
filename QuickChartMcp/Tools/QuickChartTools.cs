@@ -36,9 +36,19 @@ internal sealed class QuickChartTools
         "bubbleMap dataset: { outline: '<map name>', data: [{ longitude, latitude, value }] }. " +
         "When a named map is used, the projection/color/size scales, showOutline, and a hidden legend are defaulted " +
         "automatically; override via options.scales (e.g. projection 'albersUsa' for US maps) if needed. " +
-        "GET /maps on the instance lists available maps; GET /maps?name=<map> lists each map's matchable features. " +
+        "Use the list_maps tool to discover available maps and each map's matchable features. " +
         "Inline GeoJSON Features still work anywhere a named reference does - use them only for custom shapes. " +
         "JS-string configs can also call getMap('<map name>'), which returns { features, topology }.";
+
+    private const string ListMapsDescription =
+        "List the built-in geo maps available on the QuickChart instance for choropleth/bubbleMap charts " +
+        "(see create_chart). Without mapName: returns every available map as { name, source } - sources are " +
+        "world-atlas, us-atlas, and datamaps (per-country ISO 3166-1 alpha-3 maps; a few codes are non-standard, " +
+        "e.g. 'kos' for Kosovo). With mapName: returns { name, source, features: [{ name, id }] } - the feature " +
+        "names/ids that choropleth data rows can reference, matched case-insensitively by name first, then id. " +
+        "Call this before create_chart when unsure of a country map code or of exact feature names/ids " +
+        "(subdivision names are in local spelling, some are null and only matchable by id, e.g. 'DE.BE'). " +
+        "Note: 'us-counties' has ~3200 features, so prefer listing smaller maps. Returns JSON inline; writes no files.";
 
     private const string ChartArgDescription =
         "Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax " +
@@ -130,6 +140,37 @@ internal sealed class QuickChartTools
                 height,
                 devicePixelRatio,
                 contentType = result.ContentType,
+            };
+        }
+        catch (Exception ex)
+        {
+            return Error(ex);
+        }
+    }
+
+    [McpServerTool(Name = "list_maps")]
+    [Description(ListMapsDescription)]
+    public async Task<object> ListMaps(
+        [Description("Optional map name (e.g. 'world', 'us-states', 'deu'). When omitted, all available maps are listed. When provided, that map's matchable features (name/id pairs) are returned.")] string? mapName = null,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var result = await _client.ListMapsAsync(mapName, cancellationToken);
+            return string.IsNullOrWhiteSpace(mapName)
+                ? new { success = true, maps = result }
+                : new { success = true, map = result };
+        }
+        catch (QuickChartApiException api) when (api.StatusCode == 400)
+        {
+            // For this tool a 400 means the map name itself is unknown - the generic
+            // "fix the chart config" hint of Error() would mislead.
+            return new
+            {
+                success = false,
+                error = api.Message,
+                statusCode = api.StatusCode,
+                hint = "Unknown map name. Call list_maps without arguments to see all available maps.",
             };
         }
         catch (Exception ex)

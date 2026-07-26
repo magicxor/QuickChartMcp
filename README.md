@@ -80,10 +80,24 @@ GeoJSON needed for standard maps:
 `data: [{ "longitude": ..., "latitude": ..., "value": ... }]`. When a named map is used, the
 `projection`/`color`/`size` scales, `showOutline`, and a hidden legend are defaulted
 automatically; set `options.scales` yourself to override (e.g. projection `albersUsa` for US
-maps). `GET /maps` on the instance lists available maps and `GET /maps?name=<map>` lists a
-map's matchable features. Inline GeoJSON Features still work anywhere a named reference does —
+maps). Use the [`list_maps` tool](#tool-list_maps) to discover available maps and their
+matchable features. Inline GeoJSON Features still work anywhere a named reference does —
 use them for custom shapes, and mind the instance's request body limit (`EXPRESS_JSON_LIMIT`,
 default 100 KB) when doing so.
+
+## Tool: `list_maps`
+
+Proxies the instance's `GET /maps` discovery endpoint so the calling agent can self-serve
+map names and feature spellings without HTTP access to the instance:
+
+| Argument | Required | Default | Notes |
+|----------|----------|---------|-------|
+| `mapName` | no | *(none)* | omit to list all maps as `{ name, source }`; set (e.g. `world`, `us-states`, `deu`) to get that map's features as `{ name, id }` pairs |
+
+Returns JSON inline (`{ "success": true, "maps": [...] }` or `{ "success": true, "map": {...} }`)
+and writes no files. Useful when a country map's ISO alpha-3 code is non-standard (e.g. `kos`
+for Kosovo) or when subdivision features are only matchable by id (some have `name: null`,
+ids like `DE.BE`). An unknown `mapName` returns `{ "success": false, ... }` with a hint.
 
 ## Configuration
 
