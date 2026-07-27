@@ -30,12 +30,14 @@ internal sealed class QuickChartTools
         "parallel coordinates: pcp, logarithmicPcp; set diagrams: venn, euler; word clouds: wordCloud. " +
         "Also available: the 'hierarchical' category axis scale, the annotation and datalabels plugins " +
         "(options.plugins.annotation / options.plugins.datalabels), and time scales with moment.js format strings. " +
-        "DATA LABELS: options.plugins.datalabels is on by default for pie/doughnut and off elsewhere, so any " +
-        "datalabels option (e.g. display: true) turns it on. Its default label text already handles object data - " +
-        "an { x, y } point shows the value-axis coordinate, an { x, y, r } bubble shows r, a choropleth row shows " +
-        "the feature name above the value, and a bubbleMap row shows its value - so a custom formatter is only " +
+        "DATA LABELS: options.plugins.datalabels is on by default for the types that draw no axis to read a value " +
+        "off - pie, doughnut, funnel - and off elsewhere, so any datalabels option (e.g. display: true) turns it on. " +
+        "Its default label text already handles object data - an { x, y } point shows the value-axis coordinate, an " +
+        "{ x, y, r } bubble shows r, a funnel stage shows its name above its value, a choropleth row shows the " +
+        "feature name above the value, and a bubbleMap row shows its value - so a custom formatter is only " +
         "needed to change that text, never to make it readable. A formatter returning an array of strings renders " +
-        "one line per element. " +
+        "one line per element. A funnel prints the values as given: pass the numbers to show, not fractions. " +
+        "Set display: 'auto' to have labels that would overlap hidden instead. " +
         "GEO CHARTS: the instance bundles map data - reference maps by name, do NOT inline GeoJSON for standard maps. " +
         "Map names: 'world', 'world-50m', 'world-land', 'us', 'us-states', 'us-counties', and ISO 3166-1 alpha-3 " +
         "country codes ('deu', 'fra', 'jpn', ...) for a single country with its first-level subdivisions. " +
@@ -52,6 +54,13 @@ internal sealed class QuickChartTools
         "To show only part of a map, set options.scales.projection.fit to [west, south, east, north] in degrees " +
         "(west may exceed east for a region past the antimeridian), { map, features: [...] }, { map } or GeoJSON: " +
         "the view is framed on that region, the projection is aimed at it, and everything outside is clipped. " +
+        "A feature covers a country's whole territory, so framing one that has distant parts reaches them too - " +
+        "France's world feature includes French Guiana in South America. Add mainland: true to a fit object " +
+        "({ map, features: [...], mainland: true }) to frame only the main body of that geometry. " +
+        "COVERAGE: a choropleth paints the features it has data rows for and leaves the rest as the grey backdrop, " +
+        "so this tool returns a 'warnings' entry listing the features in view that got no row (up to 20 of them, " +
+        "then a count). Fill them in, or state in your answer that their data is unknown - never invent values to " +
+        "silence it. " +
         "To aim a projection by hand, options.scales.projection.projection also accepts an object - " +
         "{ type: 'conicEqualArea', rotate: [-100, 0], center: [0, 65], parallels: [50, 70] }, plus clipAngle, " +
         "clipExtent, precision, angle, reflectX, reflectY - and pixel-space nudging is available via the scale's " +
@@ -160,17 +169,25 @@ internal sealed class QuickChartTools
             var written = await _writer.WriteBytesAsync(
                 outputDirectory, fileName, DeriveBaseName(chartNode), extension, result.Bytes, cancellationToken);
 
-            return new
+            var summary = new Dictionary<string, object?>
             {
-                success = true,
-                filePath = written.Path,
-                bytes = written.Bytes,
-                format = normalizedFormat,
-                width,
-                height,
-                devicePixelRatio,
-                contentType = result.ContentType,
+                ["success"] = true,
+                ["filePath"] = written.Path,
+                ["bytes"] = written.Bytes,
+                ["format"] = normalizedFormat,
+                ["width"] = width,
+                ["height"] = height,
+                ["devicePixelRatio"] = devicePixelRatio,
+                ["contentType"] = result.ContentType,
             };
+
+            // Only when there is something to say: the chart rendered either way, and an
+            // always-present empty list would read as noise on every single call.
+            var warnings = DescribeGeoCoverage(result.GeoCoverage);
+            if (warnings.Count > 0)
+                summary["warnings"] = warnings;
+
+            return summary;
         }
         catch (Exception ex)
         {
@@ -207,6 +224,53 @@ internal sealed class QuickChartTools
         {
             return Error(ex);
         }
+    }
+
+    /// <summary>
+    /// Turns the instance's geo coverage report into warnings the caller can act on: a
+    /// choropleth paints only the features it has data rows for, and the ones it skips are
+    /// drawn as the grey backdrop, which looks exactly like an unfinished map.
+    /// </summary>
+    /// <remarks>
+    /// Reports arrive over a wire the caller configured, so this phrases whatever it is given
+    /// rather than trusting the numbers to line up: an entry that reports nothing missing is
+    /// not a warning, and a region the instance could not name is counted rather than printed
+    /// as a blank item. What it must never do is drop a report it can still act on - the
+    /// counts and the other names are the whole point of the header.
+    /// </remarks>
+    internal static List<string> DescribeGeoCoverage(GeoCoverage? coverage)
+    {
+        if (coverage is null)
+            return [];
+
+        var warnings = new List<string>();
+        foreach (var map in coverage.Maps)
+        {
+            // One list, so an unnamed remainder reads as "and 3 more" rather than
+            // ", and 3 more". Features the instance has no name or id for come through
+            // in More; a blank name is the same thing said differently, so it joins them.
+            var named = map.Missing.Where(static name => !string.IsNullOrWhiteSpace(name)).ToList();
+            var unnamed = map.More + (map.Missing.Count - named.Count);
+            if (unnamed > 0)
+                named.Add($"and {unnamed} more");
+
+            // Anything at all to report: a region to name, one to count, or a shortfall in
+            // the counts. Reading the counts alone would drop a named region that arrived
+            // with a shortfall of zero, and a named region is the actionable part.
+            var uncovered = Math.Max(0, map.Framed - map.Covered);
+            if (named.Count == 0 && uncovered == 0)
+                continue;
+
+            var listed = named.Count > 0 ? $": {string.Join(", ", named)}" : string.Empty;
+            warnings.Add(
+                $"Map '{map.Map}': only {map.Covered} of the {map.Framed} features in view have a data row. "
+                + $"Without one a feature is drawn as the grey backdrop, indistinguishable from a region with no data{listed}. "
+                + "If that is not intended, add data rows for them (list_maps lists every feature of the map: "
+                + "by name, or by id where the map data gives it no name). "
+                + "If the data genuinely does not exist, keep them grey and say so in your answer - do not invent values.");
+        }
+
+        return warnings;
     }
 
     /// <summary>

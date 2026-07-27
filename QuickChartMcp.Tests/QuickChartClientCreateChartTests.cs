@@ -13,6 +13,9 @@ public class QuickChartClientCreateChartTests
     {
         public string? Body { get; private set; }
 
+        /// <summary>Value of the geo coverage header the stub response carries, if any.</summary>
+        public string? GeoCoverageHeader { get; init; }
+
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request, CancellationToken cancellationToken)
         {
@@ -25,18 +28,32 @@ public class QuickChartClientCreateChartTests
                 Content = new ByteArrayContent([1, 2, 3]),
             };
             response.Content.Headers.ContentType = new MediaTypeHeaderValue("image/png");
+            if (GeoCoverageHeader is not null)
+                response.Headers.TryAddWithoutValidation("X-quickchart-geo-coverage", GeoCoverageHeader);
+
             return response;
         }
     }
 
+    private static QuickChartClient ClientFor(HttpMessageHandler handler) =>
+        new(new HttpClient(handler) { BaseAddress = new Uri("http://qc.test/") });
+
     private static async Task<JsonObject> PostAsync(ChartRequest request)
     {
         var handler = new CapturingHandler();
-        var client = new QuickChartClient(new HttpClient(handler) { BaseAddress = new Uri("http://qc.test/") });
 
-        await client.CreateChartAsync(request, CancellationToken.None);
+        await ClientFor(handler).CreateChartAsync(request, CancellationToken.None);
 
         return Assert.IsType<JsonObject>(JsonNode.Parse(handler.Body!));
+    }
+
+    private static async Task<GeoCoverage?> CoverageFromAsync(string? header)
+    {
+        var handler = new CapturingHandler { GeoCoverageHeader = header };
+
+        var result = await ClientFor(handler).CreateChartAsync(Request(), CancellationToken.None);
+
+        return result.GeoCoverage;
     }
 
     private static ChartRequest Request() => new()
@@ -72,5 +89,51 @@ public class QuickChartClientCreateChartTests
 
         Assert.Equal(900, (int?)body["width"]);
         Assert.False(body.ContainsKey("height"));
+    }
+
+    [Fact]
+    public async Task ReadsTheGeoCoverageTheInstanceReported()
+    {
+        // Verbatim wire format, escapes included: a header value cannot carry non-ASCII,
+        // so the instance writes those names as JSON \uXXXX - and a per-country map spells
+        // its subdivisions locally, which is where they come from. Raw string literal, so
+        // the \u below reaches the deserializer as the two characters it is on the wire.
+        var coverage = await CoverageFromAsync(
+            """{"maps":[{"map":"deu","framed":16,"covered":2,"missing":["Berlin","Baden-W\u00fcrttemberg"],"more":3}]}""");
+
+        var map = Assert.Single(coverage!.Maps);
+        Assert.Equal("deu", map.Map);
+        Assert.Equal(16, map.Framed);
+        Assert.Equal(2, map.Covered);
+        Assert.Equal(["Berlin", "Baden-Württemberg"], map.Missing);
+        Assert.Equal(3, map.More);
+    }
+
+    [Fact]
+    public async Task ReportsNoCoverageWhenTheInstanceSentNone()
+    {
+        Assert.Null(await CoverageFromAsync(null));
+    }
+
+    [Fact]
+    public async Task IgnoresAGeoCoverageHeaderItCannotParse()
+    {
+        // The chart itself rendered; a broken diagnostic must not fail the call.
+        Assert.Null(await CoverageFromAsync("{not json"));
+    }
+
+    [Theory]
+    // Parseable JSON that would leave a non-nullable member null. Whatever a
+    // caller has pointed this client at, a diagnostic header must not hand a
+    // null list to the code that phrases the warning.
+    [InlineData("""{"maps":null}""")]
+    [InlineData("""{"maps":[{"map":"blr","framed":7,"covered":2,"missing":null}]}""")]
+    [InlineData("""{"maps":[{"map":"blr","framed":7,"covered":2,"missing":["Gomel",null]}]}""")]
+    [InlineData("""{"maps":[{"map":null,"framed":7,"covered":2,"missing":["Gomel"]}]}""")]
+    [InlineData("""{"maps":[null]}""")]
+    [InlineData("null")]
+    public async Task IgnoresAGeoCoverageHeaderWithNullsWhereListsBelong(string header)
+    {
+        Assert.Null(await CoverageFromAsync(header));
     }
 }
