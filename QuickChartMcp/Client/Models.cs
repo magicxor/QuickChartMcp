@@ -20,9 +20,18 @@ public sealed record ChartRequest
     /// </summary>
     public required JsonNode Chart { get; init; }
 
-    public int Width { get; init; } = 1280;
+    /// <summary>
+    /// Canvas width in logical pixels, or null to let the instance derive it from the chart
+    /// (a map is sized to the map's own proportions, other types to the ratio their type is
+    /// read at). Null is omitted from the request body, which is what the instance reads as
+    /// "not specified".
+    /// </summary>
+    public int? Width { get; init; }
 
-    public int Height { get; init; } = 1280;
+    /// <summary>
+    /// Canvas height in logical pixels, or null to derive it — see <see cref="Width"/>.
+    /// </summary>
+    public int? Height { get; init; }
 
     public double DevicePixelRatio { get; init; } = 2.0;
 

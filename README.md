@@ -19,8 +19,8 @@ of an inline blob.
 |----------|----------|---------|-------|
 | `chart` | yes | — | Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax (callback functions, unquoted keys) is forwarded as a string for QuickChart to evaluate. Function-valued options may also be quoted sources inside plain JSON — the instance compiles them (see [Callbacks](#callbacks-and-data-labels)) |
 | `outputDirectory` | yes | — | absolute directory the file is written to (created if missing) |
-| `width` | no | `1280` | pixel width |
-| `height` | no | `1280` | pixel height |
+| `width` | no | *(derived)* | pixel width; omit to let the instance size the canvas — see [Canvas size](#canvas-size) |
+| `height` | no | *(derived)* | pixel height; omit to let the instance size the canvas |
 | `devicePixelRatio` | no | `2.0` | output dimensions are multiplied by this |
 | `backgroundColor` | no | `transparent` | color name, hex, `rgb()` or `hsl()` |
 | `format` | no | `png` | `png`, `svg` or `pdf` (`base64` is deliberately not supported — the result is a file) |
@@ -48,6 +48,15 @@ saved as a successful chart.
 Configs must use **Chart.js 4 syntax** (`options.scales.x`/`y`, `options.plugins.title`/`legend`);
 Chart.js 2 syntax (`scales.xAxes`/`yAxes`, top-level `title`/`legend`, `type: 'horizontalBar'`)
 is not translated — use `type: 'bar'` with `options.indexAxis: 'y'` for horizontal bars.
+
+### Canvas size
+
+`width` and `height` are optional and are omitted from the request when not given, which the
+instance reads as "derive it". Whichever side is missing comes from what is being drawn: a geo
+chart is measured through its projection, so the canvas ends up shaped like the map (Russia
+landscape, Germany portrait, a region cropped with `fit` measured from the crop); other chart
+types get the ratio they are read at — 16:9 for bar/line/scatter, square for pie/doughnut/radar.
+Omit both and the longest side is 1280. Pass numbers only when a particular size is required.
 
 ### Callbacks and data labels
 
