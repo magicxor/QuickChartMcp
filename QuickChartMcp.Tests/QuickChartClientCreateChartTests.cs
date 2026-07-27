@@ -118,4 +118,17 @@ public class QuickChartClientCreateChartTests
         // The chart itself rendered; a broken diagnostic must not fail the call.
         Assert.Null(await CoverageFromAsync("{not json"));
     }
+
+    [Theory]
+    // Parseable JSON that would leave a non-nullable member null. Whatever a
+    // caller has pointed this client at, a diagnostic header must not hand a
+    // null list to the code that phrases the warning.
+    [InlineData("""{"maps":null}""")]
+    [InlineData("""{"maps":[{"map":"blr","framed":7,"covered":2,"missing":null}]}""")]
+    [InlineData("""{"maps":[null]}""")]
+    [InlineData("null")]
+    public async Task IgnoresAGeoCoverageHeaderWithNullsWhereListsBelong(string header)
+    {
+        Assert.Null(await CoverageFromAsync(header));
+    }
 }

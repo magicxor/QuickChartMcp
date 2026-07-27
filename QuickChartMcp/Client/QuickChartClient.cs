@@ -58,14 +58,38 @@ public sealed class QuickChartClient
         if (!response.Headers.TryGetValues(GeoCoverageHeader, out var values))
             return null;
 
+        GeoCoverage? coverage;
         try
         {
-            return JsonSerializer.Deserialize<GeoCoverage>(string.Concat(values), JsonOptions);
+            coverage = JsonSerializer.Deserialize<GeoCoverage>(string.Concat(values), JsonOptions);
         }
         catch (JsonException)
         {
             return null;
         }
+
+        return IsWellFormed(coverage) ? coverage : null;
+    }
+
+    /// <summary>
+    /// Whether a parsed coverage report can be read without null checks. Parseable JSON is
+    /// not enough: an explicit <c>null</c> in the payload overwrites a member's initializer,
+    /// and a non-nullable annotation is not enforced at runtime — so a header saying
+    /// <c>{"maps":null}</c> would otherwise hand a null list to the caller. Whatever
+    /// instance the client is pointed at, a diagnostic must not break a rendered chart.
+    /// </summary>
+    private static bool IsWellFormed(GeoCoverage? coverage)
+    {
+        if (coverage is not { Maps: not null })
+            return false;
+
+        foreach (var map in coverage.Maps)
+        {
+            if (map is not { Map: not null, Missing: not null })
+                return false;
+        }
+
+        return true;
     }
 
     /// <summary>

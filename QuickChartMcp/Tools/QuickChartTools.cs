@@ -238,13 +238,16 @@ internal sealed class QuickChartTools
         var warnings = new List<string>();
         foreach (var map in coverage.Maps)
         {
-            var missing = string.Join(", ", map.Missing);
+            // One list, so an unnamed remainder reads as "and 3 more" rather than
+            // ", and 3 more": features with neither a name nor an id are only counted.
+            var named = new List<string>(map.Missing);
             if (map.More > 0)
-                missing += $", and {map.More} more";
+                named.Add($"and {map.More} more");
 
+            var listed = named.Count > 0 ? $": {string.Join(", ", named)}" : string.Empty;
             warnings.Add(
                 $"Map '{map.Map}': only {map.Covered} of the {map.Framed} features in view have a data row. "
-                + $"Without one a feature is drawn as the grey backdrop, indistinguishable from a region with no data: {missing}. "
+                + $"Without one a feature is drawn as the grey backdrop, indistinguishable from a region with no data{listed}. "
                 + "If that is not intended, add data rows for them (list_maps names every feature of the map). "
                 + "If the data genuinely does not exist, keep them grey and say so in your answer - do not invent values.");
         }
