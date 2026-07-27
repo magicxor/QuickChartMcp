@@ -85,8 +85,13 @@ public sealed class QuickChartClient
 
         foreach (var map in coverage.Maps)
         {
-            if (map is not { Map: not null, Missing: not null })
+            // The names go straight into the warning text, so a null among them would
+            // print as a stray empty item - element nullability is not annotated at all.
+            if (map is not { Map: not null, Missing: not null }
+                || map.Missing.Any(static name => name is null))
+            {
                 return false;
+            }
         }
 
         return true;

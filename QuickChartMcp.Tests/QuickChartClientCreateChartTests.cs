@@ -125,6 +125,8 @@ public class QuickChartClientCreateChartTests
     // null list to the code that phrases the warning.
     [InlineData("""{"maps":null}""")]
     [InlineData("""{"maps":[{"map":"blr","framed":7,"covered":2,"missing":null}]}""")]
+    [InlineData("""{"maps":[{"map":"blr","framed":7,"covered":2,"missing":["Gomel",null]}]}""")]
+    [InlineData("""{"maps":[{"map":null,"framed":7,"covered":2,"missing":["Gomel"]}]}""")]
     [InlineData("""{"maps":[null]}""")]
     [InlineData("null")]
     public async Task IgnoresAGeoCoverageHeaderWithNullsWhereListsBelong(string header)
