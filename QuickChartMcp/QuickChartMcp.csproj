@@ -32,4 +32,10 @@
     <PackageReference Include="ModelContextProtocol" Version="1.4.1" />
   </ItemGroup>
 
+  <!-- The MCP tools are an entry point rather than an API, so they are internal - and the
+       text they hand the agent is only reachable for tests from here. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="QuickChartMcp.Tests" />
+  </ItemGroup>
+
 </Project>

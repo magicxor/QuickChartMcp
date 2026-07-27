@@ -230,7 +230,14 @@ internal sealed class QuickChartTools
     /// choropleth paints only the features it has data rows for, and the ones it skips are
     /// drawn as the grey backdrop, which looks exactly like an unfinished map.
     /// </summary>
-    private static List<string> DescribeGeoCoverage(GeoCoverage? coverage)
+    /// <remarks>
+    /// Reports arrive over a wire the caller configured, so this phrases whatever it is given
+    /// rather than trusting the numbers to line up: an entry that reports nothing missing is
+    /// not a warning, and a region the instance could not name is counted rather than printed
+    /// as a blank item. What it must never do is drop a report it can still act on - the
+    /// counts and the other names are the whole point of the header.
+    /// </remarks>
+    internal static List<string> DescribeGeoCoverage(GeoCoverage? coverage)
     {
         if (coverage is null)
             return [];
@@ -238,11 +245,16 @@ internal sealed class QuickChartTools
         var warnings = new List<string>();
         foreach (var map in coverage.Maps)
         {
+            if (map.Covered >= map.Framed)
+                continue;
+
             // One list, so an unnamed remainder reads as "and 3 more" rather than
-            // ", and 3 more": features with neither a name nor an id are only counted.
-            var named = new List<string>(map.Missing);
-            if (map.More > 0)
-                named.Add($"and {map.More} more");
+            // ", and 3 more". Features the instance has no name or id for come through
+            // in More; a blank name is the same thing said differently, so it joins them.
+            var named = map.Missing.Where(static name => !string.IsNullOrWhiteSpace(name)).ToList();
+            var unnamed = map.More + (map.Missing.Count - named.Count);
+            if (unnamed > 0)
+                named.Add($"and {unnamed} more");
 
             var listed = named.Count > 0 ? $": {string.Join(", ", named)}" : string.Empty;
             warnings.Add(
