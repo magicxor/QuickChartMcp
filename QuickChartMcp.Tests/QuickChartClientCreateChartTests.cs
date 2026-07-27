@@ -94,15 +94,18 @@ public class QuickChartClientCreateChartTests
     [Fact]
     public async Task ReadsTheGeoCoverageTheInstanceReported()
     {
-        // Non-ASCII names arrive as JSON \u escapes: a header value cannot carry them.
+        // Verbatim wire format, escapes included: a header value cannot carry non-ASCII,
+        // so the instance writes those names as JSON \uXXXX - and a per-country map spells
+        // its subdivisions locally, which is where they come from. Raw string literal, so
+        // the \u below reaches the deserializer as the two characters it is on the wire.
         var coverage = await CoverageFromAsync(
-            """{"maps":[{"map":"blr","framed":7,"covered":2,"missing":["Gomel","Минск"],"more":3}]}""");
+            """{"maps":[{"map":"deu","framed":16,"covered":2,"missing":["Berlin","Baden-W\u00fcrttemberg"],"more":3}]}""");
 
         var map = Assert.Single(coverage!.Maps);
-        Assert.Equal("blr", map.Map);
-        Assert.Equal(7, map.Framed);
+        Assert.Equal("deu", map.Map);
+        Assert.Equal(16, map.Framed);
         Assert.Equal(2, map.Covered);
-        Assert.Equal(["Gomel", "Минск"], map.Missing);
+        Assert.Equal(["Berlin", "Baden-Württemberg"], map.Missing);
         Assert.Equal(3, map.More);
     }
 
