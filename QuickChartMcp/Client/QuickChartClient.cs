@@ -18,6 +18,7 @@ namespace QuickChartMcp.Client;
 public sealed class QuickChartClient
 {
     private const string ErrorHeader = "X-quickchart-error";
+    private const string GeoCoverageHeader = "X-quickchart-geo-coverage";
 
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web)
     {
@@ -31,16 +32,40 @@ public sealed class QuickChartClient
         _http = http;
     }
 
-    public readonly record struct ChartResult(byte[] Bytes, string? ContentType);
+    public readonly record struct ChartResult(byte[] Bytes, string? ContentType, GeoCoverage? GeoCoverage);
 
-    /// <summary>Renders a chart and returns the raw response bytes (png/svg/pdf).</summary>
+    /// <summary>
+    /// Renders a chart and returns the raw response bytes (png/svg/pdf) together with the
+    /// geo coverage the instance reported, if any (see <see cref="GeoCoverage"/>).
+    /// </summary>
     public async Task<ChartResult> CreateChartAsync(ChartRequest request, CancellationToken ct)
     {
         using var response = await _http.PostAsJsonAsync("chart", request, JsonOptions, ct);
         await EnsureSuccessAsync(response, ct);
 
         var bytes = await response.Content.ReadAsByteArrayAsync(ct);
-        return new ChartResult(bytes, response.Content.Headers.ContentType?.MediaType);
+        return new ChartResult(
+            bytes, response.Content.Headers.ContentType?.MediaType, ReadGeoCoverage(response));
+    }
+
+    /// <summary>
+    /// Reads the geo coverage header. The instance escapes non-ASCII names as JSON
+    /// <c>\uXXXX</c>, since a header value cannot carry them, so this parses as-is.
+    /// A malformed diagnostic is dropped: the chart itself rendered fine.
+    /// </summary>
+    private static GeoCoverage? ReadGeoCoverage(HttpResponseMessage response)
+    {
+        if (!response.Headers.TryGetValues(GeoCoverageHeader, out var values))
+            return null;
+
+        try
+        {
+            return JsonSerializer.Deserialize<GeoCoverage>(string.Concat(values), JsonOptions);
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
     }
 
     /// <summary>

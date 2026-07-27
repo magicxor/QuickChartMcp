@@ -39,3 +39,32 @@ public sealed record ChartRequest
 
     public string Format { get; init; } = "png";
 }
+
+/// <summary>
+/// Payload of the <c>X-quickchart-geo-coverage</c> response header: the features of each
+/// built-in map that a choropleth left without a data row. The instance omits the header
+/// entirely when every feature in view has one, so its presence is the signal.
+/// </summary>
+public sealed record GeoCoverage
+{
+    public IReadOnlyList<GeoMapCoverage> Maps { get; init; } = [];
+}
+
+/// <summary>Coverage of one map, pooled across the datasets that draw it.</summary>
+public sealed record GeoMapCoverage
+{
+    /// <summary>Built-in map name, e.g. <c>world</c> or <c>rus</c>.</summary>
+    public string Map { get; init; } = string.Empty;
+
+    /// <summary>Features of the map the view shows — a projection fit narrows this.</summary>
+    public int Framed { get; init; }
+
+    /// <summary>How many of the framed features have a data row.</summary>
+    public int Covered { get; init; }
+
+    /// <summary>Names of framed features without a data row (at most 20).</summary>
+    public IReadOnlyList<string> Missing { get; init; } = [];
+
+    /// <summary>How many uncovered features are not named in <see cref="Missing"/>.</summary>
+    public int More { get; init; }
+}

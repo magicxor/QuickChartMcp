@@ -26,7 +26,9 @@ of an inline blob.
 | `format` | no | `png` | `png`, `svg` or `pdf` (`base64` is deliberately not supported — the result is a file) |
 | `fileName` | no | *(derived)* | bare leaf name; derived from the chart title (fallback `chart`) when omitted; a numeric suffix is appended on collision |
 
-On success the tool returns `{ "success": true, "filePath": "...", "bytes": N, ... }`; on any
+On success the tool returns `{ "success": true, "filePath": "...", "bytes": N, ... }`, plus a
+`warnings` list when the chart rendered but something about it is worth knowing (see
+[Regions left without data](#regions-left-without-data)); on any
 error it returns `{ "success": false, "error": "..." }` (plus `statusCode`, and a `hint` for
 HTTP 400) and writes nothing. QuickChart's error contract: **400** = invalid request/config
 (fix the config, don't retry unchanged), **500** = server failure; the error message always
@@ -66,11 +68,13 @@ quoted source in plain JSON (`"formatter": "function(v) { return v.y; }"`), whic
 compiles before rendering. A quoted source that does not parse comes back as an HTTP 400 naming
 the option instead of being drawn as a label.
 
-`options.plugins.datalabels` is on by default for pie/doughnut and off elsewhere, so any
-datalabels option turns it on. Its default label text handles object data without a formatter:
-an `{ x, y }` point shows the value-axis coordinate, `{ x, y, r }` shows `r`, a choropleth row
-shows the feature name above the value, and a `bubbleMap` row shows its value. A formatter that
-returns an array of strings renders one line per element.
+`options.plugins.datalabels` is on by default for the types that draw no axis to read a value
+off — pie, doughnut, funnel — and off elsewhere, so any datalabels option turns it on. Its
+default label text handles object data without a formatter: an `{ x, y }` point shows the
+value-axis coordinate, `{ x, y, r }` shows `r`, a funnel stage shows its name above its value,
+a choropleth row shows the feature name above the value, and a `bubbleMap` row shows its value.
+A formatter that returns an array of strings renders one line per element. `display: 'auto'`
+hides the labels that would overlap one already drawn.
 
 ### Geo charts
 
@@ -128,6 +132,26 @@ clipped, and the automatic projection is aimed at the region rather than at the 
 ```
 
 West may exceed east for a region past the antimeridian (`[160, 62, -172, 72]` is Chukotka).
+
+A feature covers a country's whole territory, and France's world feature reaches South America
+through French Guiana — so framing it stretches the view across the Atlantic. Add
+`"mainland": true` to a fit object (`{ "map": "world", "features": ["France"], "mainland": true }`)
+to frame only the main body of that geometry.
+
+#### Regions left without data
+
+A choropleth paints the features it has data rows for and leaves the rest as the grey backdrop,
+which looks the same as a region whose value is genuinely unknown. When a render leaves features
+out, `create_chart` returns a `warnings` entry naming them, e.g.:
+
+```
+Map 'blr': only 2 of the 7 features in view have a data row. Without one a feature is drawn as
+the grey backdrop, indistinguishable from a region with no data: Gomel, Grodno, Mogilev, ...
+```
+
+Either add rows for them (`list_maps` names every feature) or say in your answer that their data
+is unknown — the warning is not a reason to invent values. A `fit` narrows what counts, so
+cropping Russia to the Far East does not report the rest of the country.
 
 To aim a projection by hand instead, note that the scale is `options.scales.projection` and the
 projection *it uses* is its own `projection` option — i.e. `options.scales.projection.projection`,
