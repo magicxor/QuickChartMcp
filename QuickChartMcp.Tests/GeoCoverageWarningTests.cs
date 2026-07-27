@@ -29,6 +29,8 @@ public class GeoCoverageWarningTests
 
         Assert.Contains("Map 'blr': only 2 of the 7 features in view have a data row.", warning);
         Assert.Contains("no data: Gomel, Mogilev.", warning);
+        // Some subdivisions are matchable by id only, so the text must not promise a name.
+        Assert.Contains("by name, or by id where the map data gives it no name", warning);
         // The agent must not read a nudge to fill the gaps as a licence to make them up.
         Assert.Contains("do not invent values", warning);
     }
@@ -87,6 +89,40 @@ public class GeoCoverageWarningTests
         // The instance never sends one; a report is only ever a report.
         Assert.Empty(QuickChartTools.DescribeGeoCoverage(Coverage(
             new GeoMapCoverage { Map = string.Empty, Framed = 0, Covered = 0, Missing = [] })));
+        // Counts that overshoot say nothing either, rather than a negative shortfall.
+        Assert.Empty(QuickChartTools.DescribeGeoCoverage(Coverage(
+            new GeoMapCoverage { Map = "blr", Framed = 7, Covered = 9, Missing = [] })));
+    }
+
+    [Fact]
+    public void WarnsAboutANamedRegionEvenWhenTheCountsSayNothingIsMissing()
+    {
+        // The named region is the actionable half of the report, so counts that do not
+        // line up with it must not be what decides whether it is mentioned at all.
+        var warning = Single(Coverage(new GeoMapCoverage
+        {
+            Map = "blr",
+            Framed = 0,
+            Covered = 0,
+            Missing = ["Gomel"],
+        }));
+
+        Assert.Contains("no data: Gomel.", warning);
+    }
+
+    [Fact]
+    public void WarnsAboutACountedRegionEvenWhenTheCountsSayNothingIsMissing()
+    {
+        var warning = Single(Coverage(new GeoMapCoverage
+        {
+            Map = "blr",
+            Framed = 0,
+            Covered = 0,
+            Missing = [],
+            More = 2,
+        }));
+
+        Assert.Contains("no data: and 2 more.", warning);
     }
 
     [Fact]

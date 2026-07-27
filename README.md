@@ -149,8 +149,9 @@ Map 'blr': only 2 of the 7 features in view have a data row. Without one a featu
 the grey backdrop, indistinguishable from a region with no data: Gomel, Grodno, Mogilev, ...
 ```
 
-Either add rows for them (`list_maps` names every feature) or say in your answer that their data
-is unknown — the warning is not a reason to invent values. A `fit` narrows what counts, so
+Either add rows for them (`list_maps` lists every feature of the map — by name, or by id where
+the map data gives it none) or say in your answer that their data is unknown — the warning is not
+a reason to invent values. A `fit` narrows what counts, so
 cropping Russia to the Far East does not report the rest of the country.
 
 To aim a projection by hand instead, note that the scale is `options.scales.projection` and the

@@ -58,8 +58,9 @@ internal sealed class QuickChartTools
         "France's world feature includes French Guiana in South America. Add mainland: true to a fit object " +
         "({ map, features: [...], mainland: true }) to frame only the main body of that geometry. " +
         "COVERAGE: a choropleth paints the features it has data rows for and leaves the rest as the grey backdrop, " +
-        "so this tool returns a 'warnings' entry naming the features in view that got no row. Fill them in, or " +
-        "state in your answer that their data is unknown - never invent values to silence it. " +
+        "so this tool returns a 'warnings' entry listing the features in view that got no row (up to 20 of them, " +
+        "then a count). Fill them in, or state in your answer that their data is unknown - never invent values to " +
+        "silence it. " +
         "To aim a projection by hand, options.scales.projection.projection also accepts an object - " +
         "{ type: 'conicEqualArea', rotate: [-100, 0], center: [0, 65], parallels: [50, 70] }, plus clipAngle, " +
         "clipExtent, precision, angle, reflectX, reflectY - and pixel-space nudging is available via the scale's " +
@@ -245,9 +246,6 @@ internal sealed class QuickChartTools
         var warnings = new List<string>();
         foreach (var map in coverage.Maps)
         {
-            if (map.Covered >= map.Framed)
-                continue;
-
             // One list, so an unnamed remainder reads as "and 3 more" rather than
             // ", and 3 more". Features the instance has no name or id for come through
             // in More; a blank name is the same thing said differently, so it joins them.
@@ -256,11 +254,19 @@ internal sealed class QuickChartTools
             if (unnamed > 0)
                 named.Add($"and {unnamed} more");
 
+            // Anything at all to report: a region to name, one to count, or a shortfall in
+            // the counts. Reading the counts alone would drop a named region that arrived
+            // with a shortfall of zero, and a named region is the actionable part.
+            var uncovered = Math.Max(0, map.Framed - map.Covered);
+            if (named.Count == 0 && uncovered == 0)
+                continue;
+
             var listed = named.Count > 0 ? $": {string.Join(", ", named)}" : string.Empty;
             warnings.Add(
                 $"Map '{map.Map}': only {map.Covered} of the {map.Framed} features in view have a data row. "
                 + $"Without one a feature is drawn as the grey backdrop, indistinguishable from a region with no data{listed}. "
-                + "If that is not intended, add data rows for them (list_maps names every feature of the map). "
+                + "If that is not intended, add data rows for them (list_maps lists every feature of the map: "
+                + "by name, or by id where the map data gives it no name). "
                 + "If the data genuinely does not exist, keep them grey and say so in your answer - do not invent values.");
         }
 
