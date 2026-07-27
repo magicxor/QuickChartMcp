@@ -19,6 +19,9 @@ internal sealed class QuickChartTools
     private const string ToolDescription =
         "Render a chart via a self-hosted QuickChart instance (Chart.js 4) and save the result to the given " +
         "output directory. Returns the file path and metadata; the binary is NOT returned inline. " +
+        "CANVAS SIZE: width and height are optional. Omit both - the usual case - and the instance sizes the " +
+        "canvas from the chart itself, longest side 1280; give one and the other follows it; give both only when " +
+        "a specific size is required. " +
         "Supported chart types - standard Chart.js 4: bar, line, pie, doughnut, radar, polarArea, scatter, bubble; " +
         "QuickChart custom: sparkline, progressBar, donut (alias of doughnut); " +
         "box plots: boxplot, horizontalBoxplot, violin, horizontalViolin; " +
@@ -31,9 +34,8 @@ internal sealed class QuickChartTools
         "datalabels option (e.g. display: true) turns it on. Its default label text already handles object data - " +
         "an { x, y } point shows the value-axis coordinate, an { x, y, r } bubble shows r, a choropleth row shows " +
         "the feature name above the value, and a bubbleMap row shows its value - so a custom formatter is only " +
-        "needed to " +
-        "change that text, never to make it readable. A formatter returning an array of strings renders one line " +
-        "per element. " +
+        "needed to change that text, never to make it readable. A formatter returning an array of strings renders " +
+        "one line per element. " +
         "GEO CHARTS: the instance bundles map data - reference maps by name, do NOT inline GeoJSON for standard maps. " +
         "Map names: 'world', 'world-50m', 'world-land', 'us', 'us-states', 'us-counties', and ISO 3166-1 alpha-3 " +
         "country codes ('deu', 'fra', 'jpn', ...) for a single country with its first-level subdivisions. " +
@@ -114,8 +116,8 @@ internal sealed class QuickChartTools
     public async Task<object> CreateChart(
         [Description(ChartArgDescription)] string chart,
         [Description("Directory where the chart file will be written. Must be an absolute path. Created if it does not exist. REQUIRED.")] string outputDirectory,
-        [Description("Chart width in pixels (default 1280).")] int width = 1280,
-        [Description("Chart height in pixels (default 1280).")] int height = 1280,
+        [Description("Chart width in logical pixels, before devicePixelRatio. Optional - see CANVAS SIZE.")] int? width = null,
+        [Description("Chart height in logical pixels, before devicePixelRatio. Optional - see CANVAS SIZE.")] int? height = null,
         [Description("Device pixel ratio; output dimensions are multiplied by this (default 2.0; use 1.0 for exact width/height).")] double devicePixelRatio = 2.0,
         [Description("Canvas background color: a color name, hex, rgb() or hsl() value (default 'transparent').")] string backgroundColor = "transparent",
         [Description("Output format: 'png' (default), 'svg' or 'pdf'.")] string format = "png",
