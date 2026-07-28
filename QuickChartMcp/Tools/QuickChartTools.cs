@@ -350,10 +350,17 @@ internal sealed class QuickChartTools
                 return new ChartArgument { Rejection = missing };
 
             default:
+                // Name the type, not the value: ValueKind spells a boolean as "True"/"False",
+                // and "got a bare true" reads as the value that was sent rather than as what
+                // was wrong with it.
+                var kind = chart.ValueKind is JsonValueKind.True or JsonValueKind.False
+                    ? "boolean"
+                    : chart.ValueKind.ToString().ToLowerInvariant();
+
                 return new ChartArgument
                 {
                     Rejection = "The 'chart' argument must be a Chart.js configuration - a string holding "
-                        + $"JSON or JavaScript, or a JSON object; got a bare {chart.ValueKind.ToString().ToLowerInvariant()}.",
+                        + $"JSON or JavaScript, or a JSON object; got a bare {kind}.",
                 };
         }
     }

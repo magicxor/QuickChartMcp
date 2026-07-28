@@ -128,18 +128,35 @@ public sealed class CreateChartArgumentTests : IDisposable
     [Fact]
     public async Task ATruncatedConfigIsAnsweredWithTheJsonReadersOwnWords()
     {
+        const string truncated = """{"type":"bar","data":{"labels":["a"]}""";
         var handler = new StubHandler { Error = SyntaxError };
 
-        var answer = await CallAsync(StringArgument("""{"type":"bar","data":{"labels":["a"]}"""), handler);
+        var answer = await CallAsync(StringArgument(truncated), handler);
 
         Assert.False((bool)answer["success"]!);
         Assert.Equal(400, (int)answer["statusCode"]!);
 
         var hint = (string)answer["hint"]!;
-        Assert.Contains("open JSON object or array that should be closed", hint, StringComparison.Ordinal);
+        // Whatever this runtime's reader says about the same input is what the hint must
+        // carry; asserting its wording here would pin the test to a message System.Text.Json
+        // does not treat as API and has reworded before.
+        Assert.Contains(MessageOfReading(truncated), hint, StringComparison.Ordinal);
         Assert.Contains("resend the config whole", hint, StringComparison.Ordinal);
         // The point of the hint: the reported character is not the missing one.
         Assert.Contains("not the missing character", hint, StringComparison.Ordinal);
+    }
+
+    /// <summary>What this runtime's JSON reader says about <paramref name="config"/>.</summary>
+    private static string MessageOfReading(string config)
+    {
+        // ThrowsAny, not Throws: the reader raises the internal JsonReaderException, and it is
+        // as a JsonException that the tool catches it.
+        var thrown = Assert.ThrowsAny<JsonException>(() => JsonNode.Parse(config));
+
+        // A test that silently stopped exercising the truncation branch would still pass on
+        // an empty needle, so make the premise itself an assertion.
+        Assert.NotEmpty(thrown.Message);
+        return thrown.Message;
     }
 
     /// <summary>
@@ -169,16 +186,24 @@ public sealed class CreateChartArgumentTests : IDisposable
         Assert.DoesNotContain("did not parse as JSON", (string)answer["hint"]!, StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Named by type, not by value: ValueKind spells a boolean as "True", and "got a bare
+    /// true" reads as the value that was sent rather than as what was wrong with it.
+    /// </summary>
     [Theory]
-    [InlineData("42")]
-    [InlineData("true")]
-    [InlineData("""["bar"]""")]
-    public async Task AValueThatIsNoConfigAtAllIsNamedForWhatItIs(string json)
+    [InlineData("42", "number")]
+    [InlineData("true", "boolean")]
+    [InlineData("false", "boolean")]
+    [InlineData("""["bar"]""", "array")]
+    public async Task AValueThatIsNoConfigAtAllIsNamedForWhatItIs(string json, string kind)
     {
         var answer = await CallAsync(Argument(json));
 
         Assert.False((bool)answer["success"]!);
-        Assert.Contains("must be a Chart.js configuration", (string)answer["error"]!, StringComparison.Ordinal);
+
+        var error = (string)answer["error"]!;
+        Assert.Contains("must be a Chart.js configuration", error, StringComparison.Ordinal);
+        Assert.Contains($"got a bare {kind}.", error, StringComparison.Ordinal);
     }
 
     [Theory]
