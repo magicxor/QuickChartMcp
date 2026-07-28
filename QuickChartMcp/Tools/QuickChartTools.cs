@@ -85,8 +85,13 @@ internal sealed class QuickChartTools
         "Note: 'us-counties' has ~3200 features, so prefer listing smaller maps. Returns JSON inline; writes no files.";
 
     private const string ChartArgDescription =
-        "Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax " +
+        "Chart.js 4 configuration, as a string. Plain JSON is forwarded as an object; JavaScript object syntax " +
         "(e.g. with callback functions or unquoted keys) is forwarded as a string for QuickChart to evaluate. " +
+        "A JSON object is accepted in place of the string and behaves like the plain-JSON case, so it cannot " +
+        "carry unquoted functions; the string is still the form to reach for. " +
+        "Send the config whole: a string cut short (a missing closing brace or bracket at the end) is reported " +
+        "as a syntax error, not as a truncation, because a config that is not valid JSON is passed to the " +
+        "instance as JavaScript to evaluate. " +
         "Options that take a function - datalabels formatter/display, scales ticks.callback, tooltip callbacks, " +
         "scriptable colors - work either way: write them unquoted in a JavaScript config, or, in plain JSON, as " +
         "quoted sources (\"formatter\": \"function(v) { return v.y; }\"), which the QuickChart instance " +
@@ -123,7 +128,7 @@ internal sealed class QuickChartTools
     [McpServerTool(Name = "create_chart")]
     [Description(ToolDescription)]
     public async Task<object> CreateChart(
-        [Description(ChartArgDescription)] string chart,
+        [Description(ChartArgDescription)] JsonElement chart,
         [Description("Directory where the chart file will be written. Must be an absolute path. Created if it does not exist. REQUIRED.")] string outputDirectory,
         [Description("Chart width in logical pixels, before devicePixelRatio. Optional - see CANVAS SIZE.")] int? width = null,
         [Description("Chart height in logical pixels, before devicePixelRatio. Optional - see CANVAS SIZE.")] int? height = null,
@@ -133,17 +138,17 @@ internal sealed class QuickChartTools
         [Description("Optional output file name. If omitted, a name is derived from the chart title, falling back to 'chart'. Any path components are rejected. Existing files are never overwritten; a numeric suffix is appended on collision.")] string? fileName = null,
         CancellationToken cancellationToken = default)
     {
+        // Read ahead of the try: the catch below needs the JSON diagnostic this produces, and
+        // reading an argument that is already a parsed JsonElement throws nothing.
+        var argument = ReadChartArgument(chart);
+
         try
         {
             _writer.EnsureOutputDirectoryAllowed(outputDirectory);
 
-            if (string.IsNullOrWhiteSpace(chart))
+            if (argument.Rejection is not null)
             {
-                return new
-                {
-                    success = false,
-                    error = "The 'chart' argument is required and must be a non-empty Chart.js configuration.",
-                };
+                return new { success = false, error = argument.Rejection };
             }
 
             if (!FormatExtensions.TryGetValue(format, out var extension))
@@ -154,10 +159,10 @@ internal sealed class QuickChartTools
             }
 
             var normalizedFormat = extension[1..];
-            var chartNode = ParseChart(chart);
+            var chartNode = argument.Node;
             var request = new ChartRequest
             {
-                Chart = chartNode ?? (JsonNode)JsonValue.Create(chart),
+                Chart = chartNode ?? (JsonNode)JsonValue.Create(argument.Source ?? string.Empty),
                 Width = width,
                 Height = height,
                 DevicePixelRatio = devicePixelRatio,
@@ -191,7 +196,7 @@ internal sealed class QuickChartTools
         }
         catch (Exception ex)
         {
-            return Error(ex);
+            return Error(ex, argument.JsonError);
         }
     }
 
@@ -274,20 +279,82 @@ internal sealed class QuickChartTools
     }
 
     /// <summary>
-    /// Parses the chart argument as JSON when possible. Returns the parsed object, or null when
-    /// the string is not valid JSON or its root is not an object — in that case the raw string
-    /// is sent instead and the QuickChart instance evaluates it as JavaScript (the documented
-    /// way to use configs containing functions or unquoted keys).
+    /// The chart argument in the form the request body needs it, and why it is in that form.
     /// </summary>
-    private static JsonObject? ParseChart(string chart)
+    private sealed record ChartArgument
     {
-        try
+        /// <summary>The config as an object: the caller sent one, or its JSON parsed to one.</summary>
+        public JsonObject? Node { get; init; }
+
+        /// <summary>
+        /// The config as the caller wrote it, sent for the instance to evaluate as JavaScript
+        /// because it did not parse as a JSON object. Null when <see cref="Node"/> is set.
+        /// </summary>
+        public string? Source { get; init; }
+
+        /// <summary>
+        /// Why <see cref="Source"/> is not JSON, in the JSON reader's own words. Kept for the
+        /// error path: it is the only place the real cause of a truncated config is stated.
+        /// </summary>
+        public string? JsonError { get; init; }
+
+        /// <summary>
+        /// Set when the argument cannot be used at all; the tool answers with it and stops.
+        /// </summary>
+        public string? Rejection { get; init; }
+    }
+
+    /// <summary>
+    /// Reads the chart argument, which is documented as a string but is deliberately typed
+    /// loosely. Plain JSON becomes an object; anything else — a config with functions or
+    /// unquoted keys — is forwarded verbatim for the QuickChart instance to evaluate as
+    /// JavaScript, which is the documented way to send one.
+    /// </summary>
+    /// <remarks>
+    /// A caller whose config was just rejected tends to reach for the object form next. Against
+    /// a <c>string</c> parameter that fails inside the MCP SDK's argument binding — before this
+    /// class is reached, and therefore outside its error handling — and the SDK renders any such
+    /// failure as a bare "An error occurred invoking 'create_chart'." with no detail in it,
+    /// leaving the caller with strictly less to go on than the config error it was trying to fix.
+    /// Accepting both shapes keeps every answer one the caller can act on.
+    /// </remarks>
+    private static ChartArgument ReadChartArgument(JsonElement chart)
+    {
+        const string missing =
+            "The 'chart' argument is required and must be a non-empty Chart.js configuration.";
+
+        switch (chart.ValueKind)
         {
-            return JsonNode.Parse(chart) as JsonObject;
-        }
-        catch (JsonException)
-        {
-            return null;
+            case JsonValueKind.String:
+                var source = chart.GetString();
+                if (string.IsNullOrWhiteSpace(source))
+                    return new ChartArgument { Rejection = missing };
+
+                try
+                {
+                    // A root that is not an object (an array, a bare number) is no config
+                    // either, but the instance names that better than a guess here would.
+                    return JsonNode.Parse(source) is JsonObject parsed
+                        ? new ChartArgument { Node = parsed }
+                        : new ChartArgument { Source = source };
+                }
+                catch (JsonException e)
+                {
+                    return new ChartArgument { Source = source, JsonError = e.Message };
+                }
+
+            case JsonValueKind.Object:
+                return new ChartArgument { Node = JsonNode.Parse(chart.GetRawText()) as JsonObject };
+
+            case JsonValueKind.Undefined or JsonValueKind.Null:
+                return new ChartArgument { Rejection = missing };
+
+            default:
+                return new ChartArgument
+                {
+                    Rejection = "The 'chart' argument must be a Chart.js configuration - a string holding "
+                        + $"JSON or JavaScript, or a JSON object; got a bare {chart.ValueKind.ToString().ToLowerInvariant()}.",
+                };
         }
     }
 
@@ -337,7 +404,7 @@ internal sealed class QuickChartTools
         return null;
     }
 
-    private static object Error(Exception ex) => ex switch
+    private static object Error(Exception ex, string? jsonError = null) => ex switch
     {
         // 400 = the QuickChart instance rejected the request as invalid input (bad or
         // non-Chart.js-4 config, unknown chart type, out-of-range size). The config needs
@@ -347,9 +414,39 @@ internal sealed class QuickChartTools
             success = false,
             error = api.Message,
             statusCode = api.StatusCode,
-            hint = "QuickChart rejected the request (HTTP 400). Fix the chart config/request (Chart.js 4 syntax, supported chart types, sizes/body limits) and retry.",
+            hint = Hint400(api.Message, jsonError),
         },
         QuickChartApiException api => new { success = false, error = api.Message, statusCode = api.StatusCode },
         _ => new { success = false, error = ex.Message },
     };
+
+    /// <summary>
+    /// The hint for an HTTP 400, naming the parse failure when the instance reported one and
+    /// the config had been forwarded as JavaScript.
+    /// </summary>
+    /// <remarks>
+    /// A config that is not valid JSON is evaluated by the instance as
+    /// <c>new Function("return " + config)</c>, so a config cut short reports the <c>)</c> that
+    /// closes the wrapper rather than the truncation — a message that points at a character the
+    /// caller never wrote. The JSON reader, on the same input, says where it actually ran out.
+    /// Only said when the instance itself failed to parse: a config that legitimately uses
+    /// JavaScript is not JSON either, and blaming JSON for its unknown chart type would mislead.
+    /// </remarks>
+    private static string Hint400(string detail, string? jsonError)
+    {
+        const string generic =
+            "QuickChart rejected the request (HTTP 400). Fix the chart config/request (Chart.js 4 syntax, supported chart types, sizes/body limits) and retry.";
+
+        if (jsonError is null || !detail.Contains("SyntaxError", StringComparison.Ordinal))
+            return generic;
+
+        return "The config did not parse as JSON, so it was sent to the instance as JavaScript, and the "
+            + "instance could not parse it as that either. There are two readings of that. If the config was "
+            + $"meant to be plain JSON, the JSON reader's own words are the error to fix: {jsonError} "
+            + "A config cut short - a closing brace or bracket missing at the very end - is the usual cause, "
+            + "and the syntax error above names whatever the evaluator ran into instead, not the missing "
+            + "character. If the config was meant to be JavaScript, that syntax error is in the JavaScript "
+            + "itself. Either way, resend the config whole rather than reshaping the call. "
+            + generic;
+    }
 }
