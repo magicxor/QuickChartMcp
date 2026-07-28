@@ -17,7 +17,7 @@ of an inline blob.
 
 | Argument | Required | Default | Notes |
 |----------|----------|---------|-------|
-| `chart` | yes | — | Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax (callback functions, unquoted keys) is forwarded as a string for QuickChart to evaluate. Function-valued options may also be quoted sources inside plain JSON — the instance compiles them (see [Callbacks](#callbacks-and-data-labels)) |
+| `chart` | yes | — | Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax (callback functions, unquoted keys) is forwarded as a string for QuickChart to evaluate. Function-valued options may also be quoted sources inside plain JSON — the instance compiles them (see [Callbacks](#callbacks-and-data-labels)). A JSON object is accepted in place of the string and behaves like the plain-JSON case (see [The `chart` argument](#the-chart-argument)) |
 | `outputDirectory` | yes | — | absolute directory the file is written to (created if missing) |
 | `width` | no | *(derived)* | width in logical pixels; omit to let the instance size the canvas — see [Canvas size](#canvas-size) |
 | `height` | no | *(derived)* | height in logical pixels; omit to let the instance size the canvas — see [Canvas size](#canvas-size) |
@@ -35,6 +35,32 @@ HTTP 400) and writes nothing. QuickChart's error contract: **400** = invalid req
 arrives in the `X-quickchart-error` response header. A rendering failure reported via that
 header is treated as an error even when the HTTP status is 200, so an "error image" is never
 saved as a successful chart.
+
+### The `chart` argument
+
+The config travels as a **string**: that is the only form that can carry a JavaScript config,
+and it is the form to reach for. The argument is nevertheless declared with no type in the tool
+schema, so a JSON object is accepted in its place. Two things depend on that:
+
+- An object bound to a `string` parameter fails inside the MCP SDK's argument marshalling —
+  before the tool body runs, and therefore outside its error handling. The SDK renders any such
+  failure as a bare `An error occurred invoking 'create_chart'.` with no detail at all, which
+  leaves a caller that was already fixing a rejected config with strictly less to go on than it
+  had. An object is parsed instead, exactly like a string that holds plain JSON (so it cannot
+  carry unquoted functions; quoted function sources still work).
+- A value that is neither — a number, a boolean, a bare array — is answered by the type it
+  came as: `The 'chart' argument must be a Chart.js configuration - ...; got a bare number.`
+  An empty or whitespace-only string, and a `null`, are the argument being absent rather than
+  wrong, and are answered as such: `The 'chart' argument is required and must be a non-empty
+  Chart.js configuration.`
+
+A config that does not parse as JSON is passed to the instance to evaluate as
+`new Function('return ' + config)`. A **truncated** config therefore comes back as a syntax
+error naming the `)` that closes that wrapper — a character the caller never wrote, and no
+indication that a brace is missing. When the instance rejects a config it was given as
+JavaScript with a `SyntaxError`, the tool's `hint` therefore also carries what the JSON reader
+made of the same input (`There is an open JSON object or array that should be closed.
+LineNumber: 0 | BytePositionInLine: 63`), which is where a cut-short config actually shows up.
 
 ### Supported chart types
 

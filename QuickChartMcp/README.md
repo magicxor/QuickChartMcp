@@ -8,15 +8,16 @@ returning only a compact summary (file path, size, metadata) instead of an inlin
 ## Tools
 
 - `create_chart` — mirrors QuickChart's POST `/chart` endpoint: `chart` (Chart.js 4 config as
-  JSON or JavaScript-syntax string), `width`, `height`, `devicePixelRatio`,
+  a JSON or JavaScript-syntax string, or as a JSON object), `width`, `height`, `devicePixelRatio`,
   `backgroundColor`, `format` (`png`/`svg`/`pdf`), plus a required `outputDirectory` and an
   optional `fileName`. Supports all chart types of the target fork, including boxplot/violin,
   error bars, funnel, geo (choropleth/bubbleMap with built-in named maps — `world`,
   `us-states`, ISO alpha-3 country codes, … — or inline GeoJSON for custom shapes; the
   projection is aimed at the map automatically, and `options.scales.projection.fit` frames the
   view on a region), graph/tree, parallel coordinates, venn/euler and word clouds. QuickChart's 400
-  responses (invalid config) are surfaced with a fix-your-config hint; error images are never
-  saved as successful charts.
+  responses (invalid config) are surfaced with a fix-your-config hint — and, when the instance
+  could not parse the config at all, with what the JSON reader made of it, which is what names a
+  config cut short; error images are never saved as successful charts.
 - `list_maps` — proxies QuickChart's `GET /maps` discovery endpoint: without arguments lists
   the built-in geo maps (`{ name, source }`); with `mapName` returns that map's matchable
   features (`{ name, id }` pairs) for choropleth data rows, plus its bbox, centroid and
