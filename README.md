@@ -48,8 +48,11 @@ schema, so a JSON object is accepted in its place. Two things depend on that:
   leaves a caller that was already fixing a rejected config with strictly less to go on than it
   had. An object is parsed instead, exactly like a string that holds plain JSON (so it cannot
   carry unquoted functions; quoted function sources still work).
-- A value that is neither — a number, a bare array, an empty string — is answered by name:
-  `The 'chart' argument must be a Chart.js configuration - ...; got a bare number.`
+- A value that is neither — a number, a boolean, a bare array — is answered by the type it
+  came as: `The 'chart' argument must be a Chart.js configuration - ...; got a bare number.`
+  An empty or whitespace-only string, and a `null`, are the argument being absent rather than
+  wrong, and are answered as such: `The 'chart' argument is required and must be a non-empty
+  Chart.js configuration.`
 
 A config that does not parse as JSON is passed to the instance to evaluate as
 `new Function('return ' + config)`. A **truncated** config therefore comes back as a syntax
