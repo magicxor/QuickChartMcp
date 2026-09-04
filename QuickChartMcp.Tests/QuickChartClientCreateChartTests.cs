@@ -58,7 +58,7 @@ public class QuickChartClientCreateChartTests
 
     private static ChartRequest Request() => new()
     {
-        Chart = JsonNode.Parse("""{"type":"bar"}""")!,
+        Chart = (JsonObject)JsonNode.Parse("""{"type":"bar"}""")!,
     };
 
     [Fact]
