@@ -11,20 +11,16 @@ using Xunit;
 namespace QuickChartMcp.Tests;
 
 /// <summary>
-/// What create_chart makes of the shape its 'chart' argument arrives in, and what it says
-/// when the instance cannot parse it.
+/// What create_chart makes of the shape its 'chart' argument arrives in.
 /// </summary>
 /// <remarks>
-/// Both matter more than they look. The argument is typed loosely because a shape the MCP
-/// SDK cannot bind fails before the tool runs and reaches the caller as a line with no
-/// detail in it; and a config that is not JSON is evaluated by the instance as
-/// <c>new Function("return " + config)</c>, so a truncated one reports the <c>)</c> that
-/// closes the wrapper - a character the caller never wrote.
+/// The argument is typed loosely because a shape the MCP SDK cannot bind fails before the tool
+/// runs and reaches the caller as a line with no detail in it. A string is parsed here rather
+/// than handed on, so a config that is not JSON is answered with the reader's own words - the
+/// only message that names where a config cut short actually ran out.
 /// </remarks>
 public sealed class CreateChartArgumentTests : IDisposable
 {
-    private const string SyntaxError = "Invalid input\nSyntaxError: Unexpected token ')'";
-
     private readonly string _outputDirectory =
         Path.Combine(Path.GetTempPath(), "quickchartmcp-tests", Guid.NewGuid().ToString("N"));
 
@@ -96,18 +92,6 @@ public sealed class CreateChartArgumentTests : IDisposable
         Assert.IsType<JsonObject>(SentChart(handler));
     }
 
-    [Fact]
-    public async Task AConfigThatIsNotJsonStillReachesTheInstanceVerbatimToEvaluate()
-    {
-        const string javascript = "{ type: 'bar', options: { plugins: { datalabels: { formatter: function (v) { return v; } } } } }";
-        var handler = new StubHandler();
-
-        var answer = await CallAsync(StringArgument(javascript), handler);
-
-        Assert.True((bool)answer["success"]!);
-        Assert.Equal(javascript, SentChart(handler).GetValue<string>());
-    }
-
     /// <summary>
     /// The shape a caller reaches for once a config of its own has been rejected. Bound to a
     /// string parameter it would fail in the SDK's argument binding, outside this tool's reach.
@@ -126,24 +110,38 @@ public sealed class CreateChartArgumentTests : IDisposable
     }
 
     [Fact]
+    public async Task AConfigWrittenAsJavaScriptIsRejectedBeforeReachingTheInstance()
+    {
+        const string javascript = "{ type: 'bar', options: { plugins: { datalabels: { formatter: function (v) { return v; } } } } }";
+        var handler = new StubHandler();
+
+        var answer = await CallAsync(StringArgument(javascript), handler);
+
+        Assert.False((bool)answer["success"]!);
+        Assert.Null(handler.Body);
+
+        var error = (string)answer["error"]!;
+        Assert.Contains(MessageOfReading(javascript), error, StringComparison.Ordinal);
+        Assert.Contains("JavaScript object syntax", error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ATruncatedConfigIsAnsweredWithTheJsonReadersOwnWords()
     {
         const string truncated = """{"type":"bar","data":{"labels":["a"]}""";
-        var handler = new StubHandler { Error = SyntaxError };
+        var handler = new StubHandler();
 
         var answer = await CallAsync(StringArgument(truncated), handler);
 
         Assert.False((bool)answer["success"]!);
-        Assert.Equal(400, (int)answer["statusCode"]!);
+        Assert.Null(handler.Body);
 
-        var hint = (string)answer["hint"]!;
-        // Whatever this runtime's reader says about the same input is what the hint must
+        var error = (string)answer["error"]!;
+        // Whatever this runtime's reader says about the same input is what the answer must
         // carry; asserting its wording here would pin the test to a message System.Text.Json
         // does not treat as API and has reworded before.
-        Assert.Contains(MessageOfReading(truncated), hint, StringComparison.Ordinal);
-        Assert.Contains("resend the config whole", hint, StringComparison.Ordinal);
-        // The point of the hint: the reported character is not the missing one.
-        Assert.Contains("not the missing character", hint, StringComparison.Ordinal);
+        Assert.Contains(MessageOfReading(truncated), error, StringComparison.Ordinal);
+        Assert.Contains("resend it whole", error, StringComparison.Ordinal);
     }
 
     /// <summary>What this runtime's JSON reader says about <paramref name="config"/>.</summary>
@@ -153,37 +151,41 @@ public sealed class CreateChartArgumentTests : IDisposable
         // as a JsonException that the tool catches it.
         var thrown = Assert.ThrowsAny<JsonException>(() => JsonNode.Parse(config));
 
-        // A test that silently stopped exercising the truncation branch would still pass on
-        // an empty needle, so make the premise itself an assertion.
+        // A test that silently stopped exercising the parse-failure branch would still pass
+        // on an empty needle, so make the premise itself an assertion.
         Assert.NotEmpty(thrown.Message);
         return thrown.Message;
     }
 
-    /// <summary>
-    /// A config that parsed as JSON was never evaluated as JavaScript, so a syntax error in
-    /// it is the instance's own business - a JSON diagnostic would be a red herring.
-    /// </summary>
-    [Fact]
-    public async Task A400ForAConfigThatDidParseKeepsTheGenericHint()
+    [Theory]
+    [InlineData("""["bar"]""", "array")]
+    [InlineData("42", "number")]
+    [InlineData("\"bar\"", "string")]
+    [InlineData("null", "null")]
+    public async Task AJsonStringWhoseRootIsNoObjectIsNamedForWhatItIs(string json, string kind)
     {
-        var handler = new StubHandler { Error = SyntaxError };
-
-        var answer = await CallAsync(StringArgument("""{"type":"bar","options":{"plugins":{"datalabels":{"formatter":"function (v) { return v; )"}}}}"""), handler);
+        var answer = await CallAsync(StringArgument(json));
 
         Assert.False((bool)answer["success"]!);
-        Assert.DoesNotContain("did not parse as JSON", (string)answer["hint"]!, StringComparison.Ordinal);
+
+        var error = (string)answer["error"]!;
+        Assert.Contains("must be a JSON object", error, StringComparison.Ordinal);
+        Assert.Contains($"got a JSON {kind}.", error, StringComparison.Ordinal);
     }
 
-    /// <summary>A 400 that is not a parse failure is not the truncation story either.</summary>
+    /// <summary>A 400 from the instance is passed on with the one hint there is for it.</summary>
     [Fact]
-    public async Task A400ThatNamesNoSyntaxErrorKeepsTheGenericHint()
+    public async Task A400FromTheInstanceCarriesItsMessageAndTheGenericHint()
     {
-        var handler = new StubHandler { Error = "Invalid input\nUnsupported chart type 'pyramid'" };
+        const string rejection = "Invalid input\nOption \"options.plugins.datalabels.formatter\" is Javascript source, which this server does not execute.";
+        var handler = new StubHandler { Error = rejection };
 
-        var answer = await CallAsync(StringArgument("{ type: 'pyramid' }"), handler);
+        var answer = await CallAsync(StringArgument("""{"type":"bar","options":{"plugins":{"datalabels":{"formatter":"function (v) { return v; }"}}}}"""), handler);
 
         Assert.False((bool)answer["success"]!);
-        Assert.DoesNotContain("did not parse as JSON", (string)answer["hint"]!, StringComparison.Ordinal);
+        Assert.Equal(400, (int)answer["statusCode"]!);
+        Assert.Contains(rejection, (string)answer["error"]!, StringComparison.Ordinal);
+        Assert.Contains("Fix the chart config", (string)answer["hint"]!, StringComparison.Ordinal);
     }
 
     /// <summary>

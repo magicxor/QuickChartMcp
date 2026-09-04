@@ -17,7 +17,7 @@ of an inline blob.
 
 | Argument | Required | Default | Notes |
 |----------|----------|---------|-------|
-| `chart` | yes | — | Chart.js 4 configuration as a string. Plain JSON is forwarded as an object; JavaScript object syntax (callback functions, unquoted keys) is forwarded as a string for QuickChart to evaluate. Function-valued options may also be quoted sources inside plain JSON — the instance compiles them (see [Callbacks](#callbacks-and-data-labels)). A JSON object is accepted in place of the string and behaves like the plain-JSON case (see [The `chart` argument](#the-chart-argument)) |
+| `chart` | yes | — | Chart.js 4 configuration as a JSON string; a JSON object is accepted in its place (see [The `chart` argument](#the-chart-argument)). The config is data: it carries no functions, quoted or otherwise (see [Callbacks](#callbacks-and-data-labels)) |
 | `outputDirectory` | yes | — | absolute directory the file is written to (created if missing) |
 | `width` | no | *(derived)* | width in logical pixels; omit to let the instance size the canvas — see [Canvas size](#canvas-size) |
 | `height` | no | *(derived)* | height in logical pixels; omit to let the instance size the canvas — see [Canvas size](#canvas-size) |
@@ -38,29 +38,26 @@ saved as a successful chart.
 
 ### The `chart` argument
 
-The config travels as a **string**: that is the only form that can carry a JavaScript config,
-and it is the form to reach for. The argument is nevertheless declared with no type in the tool
-schema, so a JSON object is accepted in its place. Two things depend on that:
+The config travels as a **string** holding JSON, which this server parses and forwards as an
+object. The argument is nevertheless declared with no type in the tool schema, so a JSON object
+is accepted in its place: an object bound to a `string` parameter fails inside the MCP SDK's
+argument marshalling — before the tool body runs, and therefore outside its error handling —
+and the SDK renders any such failure as a bare `An error occurred invoking 'create_chart'.`
+with no detail at all, which leaves a caller that was already fixing a rejected config with
+strictly less to go on than it had.
 
-- An object bound to a `string` parameter fails inside the MCP SDK's argument marshalling —
-  before the tool body runs, and therefore outside its error handling. The SDK renders any such
-  failure as a bare `An error occurred invoking 'create_chart'.` with no detail at all, which
-  leaves a caller that was already fixing a rejected config with strictly less to go on than it
-  had. An object is parsed instead, exactly like a string that holds plain JSON (so it cannot
-  carry unquoted functions; quoted function sources still work).
-- A value that is neither — a number, a boolean, a bare array — is answered by the type it
-  came as: `The 'chart' argument must be a Chart.js configuration - ...; got a bare number.`
-  An empty or whitespace-only string, and a `null`, are the argument being absent rather than
-  wrong, and are answered as such: `The 'chart' argument is required and must be a non-empty
-  Chart.js configuration.`
+What else can arrive is answered for what it is, and nothing is sent to the instance:
 
-A config that does not parse as JSON is passed to the instance to evaluate as
-`new Function('return ' + config)`. A **truncated** config therefore comes back as a syntax
-error naming the `)` that closes that wrapper — a character the caller never wrote, and no
-indication that a brace is missing. When the instance rejects a config it was given as
-JavaScript with a `SyntaxError`, the tool's `hint` therefore also carries what the JSON reader
-made of the same input (`There is an open JSON object or array that should be closed.
-LineNumber: 0 | BytePositionInLine: 63`), which is where a cut-short config actually shows up.
+- A string that is not valid JSON — JavaScript object syntax, or a config **cut short** — is
+  answered with the JSON reader's own words (`There is an open JSON object or array that should
+  be closed. LineNumber: 0 | BytePositionInLine: 63`), which name where it actually ran out.
+- A JSON string whose root is not an object: `The 'chart' argument must be a JSON object; got a
+  JSON array.`
+- A value that is neither string nor object — a number, a boolean, a bare array — is named by
+  the type it came as: `The 'chart' argument must be a Chart.js configuration - ...; got a bare
+  number.`
+- An empty or whitespace-only string, and a `null`, are the argument being absent rather than
+  wrong: `The 'chart' argument is required and must be a non-empty Chart.js configuration.`
 
 ### Supported chart types
 
@@ -88,19 +85,23 @@ Omit both and the longest side is 1280. Pass numbers only when a particular size
 
 ### Callbacks and data labels
 
-Options that take a function — the datalabels `formatter`/`display`, `ticks.callback`, tooltip
-callbacks, scriptable colors — can be written two ways: unquoted in a JavaScript config, or as a
-quoted source in plain JSON (`"formatter": "function(v) { return v.y; }"`), which the instance
-compiles before rendering. A quoted source that does not parse comes back as an HTTP 400 naming
-the option instead of being drawn as a label.
+The config is data: the instance executes no JavaScript. Options that take a function — the
+datalabels `formatter`/`display`, `ticks.callback`, tooltip callbacks, scriptable colors — have
+no place in it, and a function source quoted into one (`"formatter": "function(v) { return v.y; }"`)
+comes back as an HTTP 400 naming the option. What they are usually written for is available as
+plain values: a data row's `label` for the text at that point, `ticks.format` with
+`Intl.NumberFormat` options (`{ "style": "percent" }`, `{ "style": "currency", "currency": "USD" }`,
+`{ "notation": "compact" }`, `{ "useGrouping": false }`) for axis numbers, an array of colors for
+per-point colors.
 
 `options.plugins.datalabels` is on by default for the types that draw no axis to read a value
 off — pie, doughnut, funnel — and off elsewhere, so any datalabels option turns it on. Its
-default label text handles object data without a formatter: an `{ x, y }` point shows the
-value-axis coordinate, `{ x, y, r }` shows `r`, a funnel stage shows its name above its value,
-a choropleth row shows the feature name above the value, and a `bubbleMap` row shows its value.
-A formatter that returns an array of strings renders one line per element. `display: 'auto'`
-hides the labels that would overlap one already drawn.
+default label text handles object data: an `{ x, y }` point shows the value-axis coordinate,
+`{ x, y, r }` shows `r`, a funnel stage shows its name above its value, a choropleth row shows
+the feature name above the value, and a `bubbleMap` row shows its value. A row's `label` is
+printed first wherever the row has one — a string, or an array of strings for one line each
+(`{ "x": "Mar", "y": 21, "label": ["21%", "record"] }`), with the value under the last on a
+map. `display: 'auto'` hides the labels that would overlap one already drawn.
 
 ### Geo charts
 
@@ -123,6 +124,7 @@ GeoJSON needed for standard maps:
       "data": [
         // rows are matched by feature name or id, case-insensitively;
         // the optional "label" is what data labels print for that region
+        // (a string, or an array of strings for one line each)
         { "feature": "Germany", "label": "Deutschland", "value": 83 },
         { "feature": "France",  "value": 67 }
       ]
@@ -288,11 +290,7 @@ claude mcp add quickchart-local \
 
 ## Notes
 
-- QuickChart evaluates a string `chart` config as JavaScript; that is the documented way to
-  use configs containing functions (e.g. tick/label formatters), and it also compiles function
-  sources quoted inside a JSON config. This server inspects neither form and rewrites nothing
-  — a JavaScript config travels as the string you passed, a JSON one is parsed and re-serialized
-  as an object — so sandboxing is the QuickChart instance's responsibility: only point this tool
-  at an instance you trust and that is not exposed to untrusted parties.
+- The `chart` config is parsed here and re-serialized as a JSON object; nothing in it is
+  rewritten, and the instance executes nothing in it.
 - On any QuickChart error (bad config, network, server), the tool returns
   `{ "success": false, "error": "...", "statusCode": <code> }` and writes no files.

@@ -14,11 +14,9 @@ namespace QuickChartMcp.Client;
 public sealed record ChartRequest
 {
     /// <summary>
-    /// Chart.js 4 configuration: a <see cref="JsonObject"/> when the caller supplied valid
-    /// JSON, or a plain string (<see cref="JsonValue"/>) when the config uses JavaScript
-    /// syntax (functions, unquoted keys) that the QuickChart instance evaluates server-side.
+    /// Chart.js 4 configuration. The instance takes it as data and executes nothing in it.
     /// </summary>
-    public required JsonNode Chart { get; init; }
+    public required JsonObject Chart { get; init; }
 
     /// <summary>
     /// Canvas width in logical pixels, or null to let the instance derive it from the chart

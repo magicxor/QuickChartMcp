@@ -34,10 +34,10 @@ internal sealed class QuickChartTools
         "off - pie, doughnut, funnel - and off elsewhere, so any datalabels option (e.g. display: true) turns it on. " +
         "Its default label text already handles object data - an { x, y } point shows the value-axis coordinate, an " +
         "{ x, y, r } bubble shows r, a funnel stage shows its name above its value, a choropleth row shows the " +
-        "feature name above the value, and a bubbleMap row shows its value - so a custom formatter is only " +
-        "needed to change that text, never to make it readable. A formatter returning an array of strings renders " +
-        "one line per element. A funnel prints the values as given: pass the numbers to show, not fractions. " +
-        "Set display: 'auto' to have labels that would overlap hidden instead. " +
+        "feature name above the value, and a bubbleMap row shows its value. To say something else at a point, " +
+        "give its data row a 'label': a string, or an array of strings for one line each " +
+        "({ x: 'Mar', y: 21, label: ['21%', 'record'] }). A funnel prints the values as given: pass the numbers " +
+        "to show, not fractions. Set display: 'auto' to have labels that would overlap hidden instead. " +
         "GEO CHARTS: the instance bundles map data - reference maps by name, do NOT inline GeoJSON for standard maps. " +
         "Map names: 'world', 'world-50m', 'world-land', 'us', 'us-states', 'us-counties', and ISO 3166-1 alpha-3 " +
         "country codes ('deu', 'fra', 'jpn', ...) for a single country with its first-level subdivisions. " +
@@ -46,7 +46,8 @@ internal sealed class QuickChartTools
         "(e.g. { feature: 'Germany' } on map 'world', { feature: 'California' } on 'us-states'). " +
         "A choropleth data row may also carry a 'label' - the region's name as it should appear in data labels: " +
         "built-in maps name their features in English only, so this is how regions get labelled in another " +
-        "language ({ feature: 'Minsk', label: 'Минская', value: 1471 }). " +
+        "language ({ feature: 'Minsk', label: 'Минская', value: 1471 }); an array of strings gives one line each, " +
+        "with the value under the last. " +
         "bubbleMap dataset: { outline: '<map name>', data: [{ longitude, latitude, value }] }. " +
         "When a named map is used, the color/size scales, showOutline and a hidden legend are defaulted " +
         "automatically, and the projection is aimed at the map - including single countries such as Russia or " +
@@ -67,8 +68,7 @@ internal sealed class QuickChartTools
         "projectionScale, projectionOffset and padding options. " +
         "Use the list_maps tool to discover available maps, each map's matchable features, and the projection " +
         "spec the server would aim at it. " +
-        "Inline GeoJSON Features still work anywhere a named reference does - use them only for custom shapes. " +
-        "JS-string configs can also call getMap('<map name>'), which returns { features, topology }.";
+        "Inline GeoJSON Features still work anywhere a named reference does - use them only for custom shapes.";
 
     private const string ListMapsDescription =
         "List the built-in geo maps available on the QuickChart instance for choropleth/bubbleMap charts " +
@@ -85,18 +85,17 @@ internal sealed class QuickChartTools
         "Note: 'us-counties' has ~3200 features, so prefer listing smaller maps. Returns JSON inline; writes no files.";
 
     private const string ChartArgDescription =
-        "Chart.js 4 configuration, as a string. Plain JSON is forwarded as an object; JavaScript object syntax " +
-        "(e.g. with callback functions or unquoted keys) is forwarded as a string for QuickChart to evaluate. " +
-        "A JSON object is accepted in place of the string and behaves like the plain-JSON case, so it cannot " +
-        "carry unquoted functions; the string is still the form to reach for. " +
-        "Send the config whole: a string cut short (a missing closing brace or bracket at the end) is reported " +
-        "as a syntax error, not as a truncation, because a config that is not valid JSON is passed to the " +
-        "instance as JavaScript to evaluate. " +
-        "Options that take a function - datalabels formatter/display, scales ticks.callback, tooltip callbacks, " +
-        "scriptable colors - work either way: write them unquoted in a JavaScript config, or, in plain JSON, as " +
-        "quoted sources (\"formatter\": \"function(v) { return v.y; }\"), which the QuickChart instance " +
-        "compiles on arrival - this tool forwards the config either way. A quoted source that does not parse " +
-        "comes back as HTTP 400 naming the option. " +
+        "Chart.js 4 configuration, as a JSON string (a JSON object is accepted in its place). " +
+        "The config is data: the instance executes no JavaScript, so options that take a function - datalabels " +
+        "formatter/display, scales ticks.callback, tooltip callbacks, scriptable colors - cannot be used, and a " +
+        "function source quoted into one (\"formatter\": \"function(v) { return v.y; }\") is rejected with " +
+        "HTTP 400 naming the option. Use plain values instead: a data row's 'label' for the text at that point " +
+        "(an array of strings for several lines), ticks.format with Intl.NumberFormat options for axis numbers " +
+        "({ style: 'percent' }, { style: 'currency', currency: 'USD' }, { notation: 'compact' }, " +
+        "{ useGrouping: false }), an array of colors for per-point colors, datalabels display: 'auto' to hide " +
+        "labels that would overlap. " +
+        "A string that is not valid JSON is rejected by this tool with the JSON reader's message; a config cut " +
+        "short (a closing brace or bracket missing at the end) is the usual cause - resend it whole. " +
         "MUST use Chart.js 4 syntax: options.scales.x / options.scales.y objects, options.plugins.title / " +
         "options.plugins.legend. Chart.js 2 syntax (scales.xAxes/yAxes arrays, top-level title/legend, " +
         "type 'horizontalBar') is NOT translated and will misrender or be rejected; use type 'bar' with " +
@@ -138,15 +137,12 @@ internal sealed class QuickChartTools
         [Description("Optional output file name. If omitted, a name is derived from the chart title, falling back to 'chart'. Any path components are rejected. Existing files are never overwritten; a numeric suffix is appended on collision.")] string? fileName = null,
         CancellationToken cancellationToken = default)
     {
-        // Read ahead of the try: the catch below needs the JSON diagnostic this produces, and
-        // reading an argument that is already a parsed JsonElement throws nothing.
-        var argument = ReadChartArgument(chart);
-
         try
         {
             _writer.EnsureOutputDirectoryAllowed(outputDirectory);
 
-            if (argument.Rejection is not null)
+            var argument = ReadChartArgument(chart);
+            if (argument.Node is null)
             {
                 return new { success = false, error = argument.Rejection };
             }
@@ -162,7 +158,7 @@ internal sealed class QuickChartTools
             var chartNode = argument.Node;
             var request = new ChartRequest
             {
-                Chart = chartNode ?? (JsonNode)JsonValue.Create(argument.Source ?? string.Empty),
+                Chart = chartNode,
                 Width = width,
                 Height = height,
                 DevicePixelRatio = devicePixelRatio,
@@ -196,7 +192,7 @@ internal sealed class QuickChartTools
         }
         catch (Exception ex)
         {
-            return Error(ex, argument.JsonError);
+            return Error(ex);
         }
     }
 
@@ -279,7 +275,7 @@ internal sealed class QuickChartTools
     }
 
     /// <summary>
-    /// The chart argument in the form the request body needs it, and why it is in that form.
+    /// The chart argument as the request body needs it, or why it cannot be used.
     /// </summary>
     private sealed record ChartArgument
     {
@@ -287,28 +283,16 @@ internal sealed class QuickChartTools
         public JsonObject? Node { get; init; }
 
         /// <summary>
-        /// The config as the caller wrote it, sent for the instance to evaluate as JavaScript
-        /// because it did not parse as a JSON object. Null when <see cref="Node"/> is set.
-        /// </summary>
-        public string? Source { get; init; }
-
-        /// <summary>
-        /// Why <see cref="Source"/> is not JSON, in the JSON reader's own words. Kept for the
-        /// error path: it is the only place the real cause of a truncated config is stated.
-        /// </summary>
-        public string? JsonError { get; init; }
-
-        /// <summary>
-        /// Set when the argument cannot be used at all; the tool answers with it and stops.
+        /// Set when the argument cannot be used; the tool answers with it and stops. Null
+        /// exactly when <see cref="Node"/> is set.
         /// </summary>
         public string? Rejection { get; init; }
     }
 
     /// <summary>
     /// Reads the chart argument, which is documented as a string but is deliberately typed
-    /// loosely. Plain JSON becomes an object; anything else — a config with functions or
-    /// unquoted keys — is forwarded verbatim for the QuickChart instance to evaluate as
-    /// JavaScript, which is the documented way to send one.
+    /// loosely. A string is parsed as JSON here, so a config that is not JSON is answered with
+    /// the JSON reader's own words - which, for a config cut short, name the place it ran out.
     /// </summary>
     /// <remarks>
     /// A caller whose config was just rejected tends to reach for the object form next. Against
@@ -330,18 +314,28 @@ internal sealed class QuickChartTools
                 if (string.IsNullOrWhiteSpace(source))
                     return new ChartArgument { Rejection = missing };
 
+                JsonNode? parsed;
                 try
                 {
-                    // A root that is not an object (an array, a bare number) is no config
-                    // either, but the instance names that better than a guess here would.
-                    return JsonNode.Parse(source) is JsonObject parsed
-                        ? new ChartArgument { Node = parsed }
-                        : new ChartArgument { Source = source };
+                    parsed = JsonNode.Parse(source);
                 }
                 catch (JsonException e)
                 {
-                    return new ChartArgument { Source = source, JsonError = e.Message };
+                    return new ChartArgument
+                    {
+                        Rejection = $"The 'chart' argument is not valid JSON: {e.Message} The config is data "
+                            + "only, so JavaScript object syntax (unquoted keys, functions) is not accepted. "
+                            + "A config cut short - a closing brace or bracket missing at the very end - is "
+                            + "the usual cause; resend it whole.",
+                    };
                 }
+
+                return parsed is JsonObject config
+                    ? new ChartArgument { Node = config }
+                    : new ChartArgument
+                    {
+                        Rejection = $"The 'chart' argument must be a JSON object; got a JSON {Describe(parsed)}.",
+                    };
 
             case JsonValueKind.Object:
                 return new ChartArgument { Node = JsonNode.Parse(chart.GetRawText()) as JsonObject };
@@ -350,27 +344,35 @@ internal sealed class QuickChartTools
                 return new ChartArgument { Rejection = missing };
 
             default:
-                // Name the type, not the value: ValueKind spells a boolean as "True"/"False",
-                // and "got a bare true" reads as the value that was sent rather than as what
-                // was wrong with it.
-                var kind = chart.ValueKind is JsonValueKind.True or JsonValueKind.False
-                    ? "boolean"
-                    : chart.ValueKind.ToString().ToLowerInvariant();
-
                 return new ChartArgument
                 {
-                    Rejection = "The 'chart' argument must be a Chart.js configuration - a string holding "
-                        + $"JSON or JavaScript, or a JSON object; got a bare {kind}.",
+                    Rejection = "The 'chart' argument must be a Chart.js configuration - a JSON string or a "
+                        + $"JSON object; got a bare {Describe(chart.ValueKind)}.",
                 };
         }
     }
 
+    /// <summary>What a parsed JSON root is, for an error message.</summary>
+    private static string Describe(JsonNode? node) => node switch
+    {
+        null => "null",
+        JsonArray => "array",
+        _ => Describe(node.GetValueKind()),
+    };
+
+    /// <summary>
+    /// Names the type, not the value: ValueKind spells a boolean as "True"/"False", and "got a
+    /// bare true" reads as the value that was sent rather than as what was wrong with it.
+    /// </summary>
+    private static string Describe(JsonValueKind kind) => kind is JsonValueKind.True or JsonValueKind.False
+        ? "boolean"
+        : kind.ToString().ToLowerInvariant();
+
     /// <summary>
     /// Derives a default file base name from the chart title: options.plugins.title.text
     /// (Chart.js 3/4) with a legacy options.title.text fallback; the text may be a string or
-    /// an array of strings. Falls back to "chart" when no title can be extracted, e.g. when
-    /// the config was sent as a raw JavaScript string. Unsafe characters are handled by the
-    /// ArtifactWriter.
+    /// an array of strings. Falls back to "chart" when no title can be extracted. Unsafe
+    /// characters are handled by the ArtifactWriter.
     /// </summary>
     private static string DeriveBaseName(JsonObject? chart)
     {
@@ -411,7 +413,10 @@ internal sealed class QuickChartTools
         return null;
     }
 
-    private static object Error(Exception ex, string? jsonError = null) => ex switch
+    private const string Hint400 =
+        "QuickChart rejected the request (HTTP 400). Fix the chart config/request (Chart.js 4 syntax, supported chart types, sizes/body limits) and retry.";
+
+    private static object Error(Exception ex) => ex switch
     {
         // 400 = the QuickChart instance rejected the request as invalid input (bad or
         // non-Chart.js-4 config, unknown chart type, out-of-range size). The config needs
@@ -421,39 +426,9 @@ internal sealed class QuickChartTools
             success = false,
             error = api.Message,
             statusCode = api.StatusCode,
-            hint = Hint400(api.Message, jsonError),
+            hint = Hint400,
         },
         QuickChartApiException api => new { success = false, error = api.Message, statusCode = api.StatusCode },
         _ => new { success = false, error = ex.Message },
     };
-
-    /// <summary>
-    /// The hint for an HTTP 400, naming the parse failure when the instance reported one and
-    /// the config had been forwarded as JavaScript.
-    /// </summary>
-    /// <remarks>
-    /// A config that is not valid JSON is evaluated by the instance as
-    /// <c>new Function("return " + config)</c>, so a config cut short reports the <c>)</c> that
-    /// closes the wrapper rather than the truncation — a message that points at a character the
-    /// caller never wrote. The JSON reader, on the same input, says where it actually ran out.
-    /// Only said when the instance itself failed to parse: a config that legitimately uses
-    /// JavaScript is not JSON either, and blaming JSON for its unknown chart type would mislead.
-    /// </remarks>
-    private static string Hint400(string detail, string? jsonError)
-    {
-        const string generic =
-            "QuickChart rejected the request (HTTP 400). Fix the chart config/request (Chart.js 4 syntax, supported chart types, sizes/body limits) and retry.";
-
-        if (jsonError is null || !detail.Contains("SyntaxError", StringComparison.Ordinal))
-            return generic;
-
-        return "The config did not parse as JSON, so it was sent to the instance as JavaScript, and the "
-            + "instance could not parse it as that either. There are two readings of that. If the config was "
-            + $"meant to be plain JSON, the JSON reader's own words are the error to fix: {jsonError} "
-            + "A config cut short - a closing brace or bracket missing at the very end - is the usual cause, "
-            + "and the syntax error above names whatever the evaluator ran into instead, not the missing "
-            + "character. If the config was meant to be JavaScript, that syntax error is in the JavaScript "
-            + "itself. Either way, resend the config whole rather than reshaping the call. "
-            + generic;
-    }
 }
