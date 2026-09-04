@@ -31,39 +31,44 @@ internal sealed class QuickChartTools
         "Also available: the 'hierarchical' category axis scale, the annotation and datalabels plugins " +
         "(options.plugins.annotation / options.plugins.datalabels), and time scales with moment.js format strings. " +
         "DATA LABELS: options.plugins.datalabels is on by default for the types that draw no axis to read a value " +
-        "off - pie, doughnut, funnel - and off elsewhere, so any datalabels option (e.g. display: true) turns it on. " +
-        "Its default label text already handles object data - an { x, y } point shows the value-axis coordinate, an " +
-        "{ x, y, r } bubble shows r, a funnel stage shows its name above its value, a choropleth row shows the " +
+        "off - pie, doughnut, funnel - and off elsewhere, so any datalabels option (e.g. \"display\": true) turns it " +
+        "on. Its default label text already handles object data - an { x, y } point shows the value-axis coordinate, " +
+        "an { x, y, r } bubble shows r, a funnel stage shows its name above its value, a choropleth row shows the " +
         "feature name above the value, and a bubbleMap row shows its value. To say something else at a point, " +
-        "give its data row a 'label': a string, or an array of strings for one line each " +
-        "({ x: 'Mar', y: 21, label: ['21%', 'record'] }). A funnel prints the values as given: pass the numbers " +
-        "to show, not fractions. Set display: 'auto' to have labels that would overlap hidden instead. " +
+        "give its data row a \"label\": a string, or an array of strings for one line each " +
+        "({ \"x\": \"Mar\", \"y\": 21, \"label\": [\"21%\", \"record\"] }). A funnel prints the values as given: pass " +
+        "the numbers to show, not fractions. Set \"display\": \"auto\" to have labels that would overlap hidden " +
+        "instead. " +
         "GEO CHARTS: the instance bundles map data - reference maps by name, do NOT inline GeoJSON for standard maps. " +
         "Map names: 'world', 'world-50m', 'world-land', 'us', 'us-states', 'us-counties', and ISO 3166-1 alpha-3 " +
         "country codes ('deu', 'fra', 'jpn', ...) for a single country with its first-level subdivisions. " +
-        "choropleth dataset: { map: '<map name>', data: [{ feature: '<feature name or id>', value: <number> }] } - " +
-        "feature strings are matched case-insensitively by properties.name or id " +
-        "(e.g. { feature: 'Germany' } on map 'world', { feature: 'California' } on 'us-states'). " +
-        "A choropleth data row may also carry a 'label' - the region's name as it should appear in data labels: " +
+        "choropleth dataset: { \"map\": \"<map name>\", \"data\": [{ \"feature\": \"<feature name or id>\", " +
+        "\"value\": <number> }] } - feature strings are matched case-insensitively by properties.name or id " +
+        "(e.g. { \"feature\": \"Germany\" } on map 'world', { \"feature\": \"California\" } on 'us-states'). " +
+        "A choropleth data row may also carry a \"label\" - the region's name as it should appear in data labels: " +
         "built-in maps name their features in English only, so this is how regions get labelled in another " +
-        "language ({ feature: 'Minsk', label: 'Минская', value: 1471 }); an array of strings gives one line each, " +
-        "with the value under the last. " +
-        "bubbleMap dataset: { outline: '<map name>', data: [{ longitude, latitude, value }] }. " +
+        "language ({ \"feature\": \"Minsk\", \"label\": \"Минская\", \"value\": 1471 }); an array of strings gives " +
+        "one line each, with the value under the last. " +
+        "bubbleMap dataset: { \"outline\": \"<map name>\", \"data\": [{ \"longitude\": <number>, " +
+        "\"latitude\": <number>, \"value\": <number> }] }. " +
         "When a named map is used, the color/size scales, showOutline and a hidden legend are defaulted " +
         "automatically, and the projection is aimed at the map - including single countries such as Russia or " +
         "New Zealand - so do NOT name a projection yourself unless you have a reason to. " +
         "To show only part of a map, set options.scales.projection.fit to [west, south, east, north] in degrees " +
-        "(west may exceed east for a region past the antimeridian), { map, features: [...] }, { map } or GeoJSON: " +
-        "the view is framed on that region, the projection is aimed at it, and everything outside is clipped. " +
+        "(west may exceed east for a region past the antimeridian), { \"map\": \"<map name>\", " +
+        "\"features\": [...] }, { \"map\": \"<map name>\" } or GeoJSON: the view is framed on that region, the " +
+        "projection is aimed at it, and everything outside is clipped. " +
         "A feature covers a country's whole territory, so framing one that has distant parts reaches them too - " +
-        "France's world feature includes French Guiana in South America. Add mainland: true to a fit object " +
-        "({ map, features: [...], mainland: true }) to frame only the main body of that geometry. " +
+        "France's world feature includes French Guiana in South America. Add \"mainland\": true to a fit object " +
+        "({ \"map\": \"world\", \"features\": [\"France\"], \"mainland\": true }) to frame only the main body of " +
+        "that geometry. " +
         "COVERAGE: a choropleth paints the features it has data rows for and leaves the rest as the grey backdrop, " +
         "so this tool returns a 'warnings' entry listing the features in view that got no row (up to 20 of them, " +
         "then a count). Fill them in, or state in your answer that their data is unknown - never invent values to " +
         "silence it. " +
         "To aim a projection by hand, options.scales.projection.projection also accepts an object - " +
-        "{ type: 'conicEqualArea', rotate: [-100, 0], center: [0, 65], parallels: [50, 70] }, plus clipAngle, " +
+        "{ \"type\": \"conicEqualArea\", \"rotate\": [-100, 0], \"center\": [0, 65], \"parallels\": [50, 70] }, " +
+        "plus clipAngle, " +
         "clipExtent, precision, angle, reflectX, reflectY - and pixel-space nudging is available via the scale's " +
         "projectionScale, projectionOffset and padding options. " +
         "Use the list_maps tool to discover available maps, each map's matchable features, and the projection " +
@@ -91,15 +96,16 @@ internal sealed class QuickChartTools
         "function source quoted into one (\"formatter\": \"function(v) { return v.y; }\") is rejected with " +
         "HTTP 400 naming the option. Use plain values instead: a data row's 'label' for the text at that point " +
         "(an array of strings for several lines), ticks.format with Intl.NumberFormat options for axis numbers " +
-        "({ style: 'percent' }, { style: 'currency', currency: 'USD' }, { notation: 'compact' }, " +
-        "{ useGrouping: false }), an array of colors for per-point colors, datalabels display: 'auto' to hide " +
-        "labels that would overlap. " +
+        "({ \"style\": \"percent\" }, { \"style\": \"currency\", \"currency\": \"USD\" }, " +
+        "{ \"notation\": \"compact\" }, { \"useGrouping\": false }), an array of colors for per-point colors, " +
+        "datalabels \"display\": \"auto\" to hide labels that would overlap. " +
         "A string that is not valid JSON is rejected by this tool with the JSON reader's message; a config cut " +
         "short (a closing brace or bracket missing at the end) is the usual cause - resend it whole. " +
         "MUST use Chart.js 4 syntax: options.scales.x / options.scales.y objects, options.plugins.title / " +
         "options.plugins.legend. Chart.js 2 syntax (scales.xAxes/yAxes arrays, top-level title/legend, " +
-        "type 'horizontalBar') is NOT translated and will misrender or be rejected; use type 'bar' with " +
-        "options.indexAxis: 'y' for horizontal bars. Invalid configs are rejected with HTTP 400. REQUIRED.";
+        "\"type\": \"horizontalBar\") is NOT translated and will misrender or be rejected; use \"type\": \"bar\" " +
+        "with \"indexAxis\": \"y\" in options for horizontal bars. Invalid configs are rejected with HTTP 400. " +
+        "REQUIRED.";
 
     /// <summary>
     /// Allowed values of the <c>format</c> argument and their file extensions. The modernized
@@ -323,10 +329,10 @@ internal sealed class QuickChartTools
                 {
                     return new ChartArgument
                     {
-                        Rejection = $"The 'chart' argument is not valid JSON: {e.Message} The config is data "
-                            + "only, so JavaScript object syntax (unquoted keys, functions) is not accepted. "
-                            + "A config cut short - a closing brace or bracket missing at the very end - is "
-                            + "the usual cause; resend it whole.",
+                        Rejection = "The 'chart' argument is not valid JSON. The config is data only, so "
+                            + "JavaScript object syntax (unquoted keys, functions) is not accepted. A config "
+                            + "cut short - a closing brace or bracket missing at the very end - is the usual "
+                            + $"cause; resend it whole. The JSON reader says: {e.Message}",
                     };
                 }
 
